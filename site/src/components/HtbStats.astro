@@ -1,0 +1,52 @@
+---
+// HtbStats.astro - HackTheBox stats display for About page
+---
+
+<div class="w-full">
+  <!-- Header -->
+  <div class="flex items-center gap-2 mb-6">
+    <svg class="w-6 h-6 text-[#3b82f6]" fill="currentColor" viewBox="0 0 24 24">
+      <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5zm0 18.5c-4.28-1.05-7.5-5.38-7.5-10V8.3l7.5-3.75 7.5 3.75v2.2c0 4.62-3.22 8.95-7.5 10z"/>
+    </svg>
+    <h3 class="text-lg font-semibold text-[#3b82f6]">HackTheBox</h3>
+  </div>
+
+  <!-- Stats Grid -->
+  <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+    <!-- Rank -->
+    <div class="bg-[#111827] border border-[#1e293b] rounded-xl p-4">
+      <div class="text-2xl font-bold text-[#f1f5f9]">Omniscient</div>
+      <div class="text-xs text-[#64748b] uppercase tracking-wider mt-1">Rank</div>
+      <div class="text-sm text-[#94a3b8] mt-1">#906 Global</div>
+    </div>
+
+    <!-- Machines -->
+    <div class="bg-[#111827] border border-[#1e293b] rounded-xl p-4">
+      <div class="text-2xl font-bold text-[#f1f5f9]">94</div>
+      <div class="text-xs text-[#64748b] uppercase tracking-wider mt-1">Machines Owned</div>
+    </div>
+
+    <!-- Flags -->
+    <div class="bg-[#111827] border border-[#1e293b] rounded-xl p-4">
+      <div class="text-2xl font-bold text-[#f1f5f9]">231</div>
+      <div class="text-xs text-[#64748b] uppercase tracking-wider mt-1">Flags</div>
+    </div>
+
+    <!-- Pro Labs -->
+    <div class="bg-[#111827] border border-[#1e293b] rounded-xl p-4 col-span-2 md:col-span-3">
+      <div class="text-sm font-semibold text-[#f1f5f9] mb-2">Pro Labs Completed</div>
+      <div class="flex flex-wrap gap-2">
+        <span class="text-xs px-2.5 py-1 rounded-full bg-[#1e293b] text-[#3b82f6] border border-[#3b82f6]/20">Chasm</span>
+        <span class="text-xs px-2.5 py-1 rounded-full bg-[#1e293b] text-[#3b82f6] border border-[#3b82f6]/20">Guardian</span>
+        <span class="text-xs px-2.5 py-1 rounded-full bg-[#1e293b] text-[#3b82f6] border border-[#3b82f6]/20">Messenger</span>
+        <span class="text-xs px-2.5 py-1 rounded-full bg-[#1e293b] text-[#3b82f6] border border-[#3b82f6]/20">BackTrack</span>
+      </div>
+    </div>
+
+    <!-- Member Since -->
+    <div class="bg-[#111827] border border-[#1e293b] rounded-xl p-4 col-span-2 md:col-span-3">
+      <div class="text-lg font-semibold text-[#f1f5f9]">September 2018</div>
+      <div class="text-xs text-[#64748b] uppercase tracking-wider mt-1">Member Since</div>
+    </div>
+  </div>
+</div>

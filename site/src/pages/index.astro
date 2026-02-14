@@ -1,0 +1,114 @@
+---
+// index.astro - Home page with hero and latest posts
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PostCard from '../components/PostCard.astro';
+import { getCollection } from 'astro:content';
+
+// Get all non-draft posts, sorted by date descending
+const allPosts = await getCollection('posts', ({ data }) => !data.draft);
+const sortedPosts = allPosts.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+
+// Get featured post
+const featuredPost = sortedPosts.find((post) => post.data.featured) || sortedPosts[0];
+
+// Calculate reading times
+const postsWithReadingTime = sortedPosts.map((post) => ({
+  ...post,
+  readingTime: Math.ceil(post.body.split(/\s+/).length / 225)
+}));
+
+const featuredPostReadingTime = Math.ceil(featuredPost.body.split(/\s+/).length / 225);
+---
+
+<BaseLayout title="Home" description="Undoing what shouldn't have shipped">
+  <!-- Hero Section -->
+  <section class="mb-16 text-center">
+    <h1 class="text-5xl md:text-6xl font-bold mb-4">
+      bksp<span class="animate-blink">_</span>
+    </h1>
+    <p class="text-xl text-[#94a3b8]">
+      undoing what shouldn't have shipped
+    </p>
+  </section>
+
+  <!-- Featured Post -->
+  {featuredPost && (
+    <section class="mb-16">
+      <h2 class="text-sm font-mono text-[#64748b] mb-4">// FEATURED</h2>
+      <div class="bg-gradient-to-r from-[#3b82f6] via-[#8b5cf6] to-[#ef4444] p-[1px] rounded-xl">
+        <a
+          href={`/posts/${featuredPost.slug}`}
+          class="block bg-[#111827] rounded-xl p-8 hover:bg-[#1e293b] transition-all duration-200 group"
+        >
+          <!-- Lane Badge -->
+          <div class="mb-4">
+            <span class={`text-xs font-mono font-medium px-3 py-1 rounded-full border inline-block ${
+              featuredPost.data.lane === 'offense' ? 'text-[#ef4444] bg-[#ef4444]/10 border-[#ef4444]/20' :
+              featuredPost.data.lane === 'defense' ? 'text-[#3b82f6] bg-[#3b82f6]/10 border-[#3b82f6]/20' :
+              'text-[#8b5cf6] bg-[#8b5cf6]/10 border-[#8b5cf6]/20'
+            }`}>
+              // {featuredPost.data.lane}
+            </span>
+          </div>
+
+          <!-- Title -->
+          <h3 class="text-2xl font-bold text-[#f1f5f9] mb-3 group-hover:text-white transition-colors">
+            {featuredPost.data.title}
+          </h3>
+
+          <!-- Description -->
+          <p class="text-[#94a3b8] mb-6">
+            {featuredPost.data.description}
+          </p>
+
+          <!-- Metadata -->
+          <div class="flex items-center gap-4 text-sm text-[#64748b]">
+            <span>
+              {featuredPost.data.date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+              })}
+            </span>
+            <span>•</span>
+            <span>{featuredPostReadingTime} min read</span>
+            <span class="ml-auto flex items-center gap-1.5 text-[#3b82f6] group-hover:translate-x-1 transition-transform">
+              Read more
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+              </svg>
+            </span>
+          </div>
+        </a>
+      </div>
+    </section>
+  )}
+
+  <!-- Latest Posts -->
+  <section>
+    <h2 class="text-sm font-mono text-[#64748b] mb-6">// LATEST</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {postsWithReadingTime.slice(0, 6).map((post) => (
+        <PostCard
+          title={post.data.title}
+          slug={post.slug}
+          date={post.data.date}
+          lane={post.data.lane}
+          description={post.data.description}
+          readingTime={post.readingTime}
+        />
+      ))}
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  @keyframes blink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+  }
+
+  .animate-blink {
+    animation: blink 1s infinite;
+  }
+</style>

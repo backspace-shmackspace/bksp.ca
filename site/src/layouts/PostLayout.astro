@@ -1,0 +1,151 @@
+---
+// PostLayout.astro - Layout for individual blog posts
+import BaseLayout from './BaseLayout.astro';
+import LaneBadge from '../components/LaneBadge.astro';
+import TagList from '../components/TagList.astro';
+import { getCollection } from 'astro:content';
+
+interface Props {
+  frontmatter: {
+    title: string;
+    date: Date;
+    lane: 'offense' | 'defense' | 'build';
+    description: string;
+    tags: string[];
+  };
+}
+
+const { frontmatter } = Astro.props;
+
+// Format date
+const formattedDate = frontmatter.date.toLocaleDateString('en-US', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric'
+});
+
+// Calculate reading time
+const content = await Astro.slots.render('default');
+const wordCount = content.split(/\s+/).length;
+const readingTime = Math.ceil(wordCount / 225);
+
+// Get all posts for prev/next navigation
+const allPosts = await getCollection('posts', ({ data }) => !data.draft);
+const sortedPosts = allPosts.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+const currentIndex = sortedPosts.findIndex((post) => post.data.title === frontmatter.title);
+const prevPost = currentIndex > 0 ? sortedPosts[currentIndex - 1] : null;
+const nextPost = currentIndex < sortedPosts.length - 1 ? sortedPosts[currentIndex + 1] : null;
+---
+
+<BaseLayout title={frontmatter.title} description={frontmatter.description}>
+  <article>
+    <!-- Post Header -->
+    <header class="mb-8">
+      <LaneBadge lane={frontmatter.lane} />
+      <h1 class="text-3xl font-bold text-[#f1f5f9] mt-4 mb-4">
+        {frontmatter.title}
+      </h1>
+      <div class="flex items-center gap-4 text-sm text-[#94a3b8]">
+        <time datetime={frontmatter.date.toISOString()}>
+          {formattedDate}
+        </time>
+        <span>•</span>
+        <span>{readingTime} min read</span>
+      </div>
+      {frontmatter.tags.length > 0 && (
+        <div class="mt-4">
+          <TagList tags={frontmatter.tags} />
+        </div>
+      )}
+    </header>
+
+    <!-- Post Content -->
+    <div class="prose prose-invert max-w-none">
+      <slot />
+    </div>
+
+    <!-- Previous/Next Navigation -->
+    {(prevPost || nextPost) && (
+      <nav class="mt-12 pt-8 border-t border-[#1e293b]">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {prevPost && (
+            <a
+              href={`/posts/${prevPost.slug}`}
+              class="block bg-[#111827] border border-[#1e293b] rounded-xl p-6 hover:border-[#334155] transition-all duration-200 group"
+            >
+              <div class="text-xs text-[#64748b] mb-2">← Previous</div>
+              <div class="text-[#f1f5f9] font-medium group-hover:text-white transition-colors">
+                {prevPost.data.title}
+              </div>
+            </a>
+          )}
+          {nextPost && (
+            <a
+              href={`/posts/${nextPost.slug}`}
+              class="block bg-[#111827] border border-[#1e293b] rounded-xl p-6 hover:border-[#334155] transition-all duration-200 group md:text-right"
+            >
+              <div class="text-xs text-[#64748b] mb-2">Next →</div>
+              <div class="text-[#f1f5f9] font-medium group-hover:text-white transition-colors">
+                {nextPost.data.title}
+              </div>
+            </a>
+          )}
+        </div>
+      </nav>
+    )}
+  </article>
+</BaseLayout>
+
+<style>
+  .prose {
+    @apply text-[#94a3b8] leading-relaxed;
+  }
+
+  .prose :global(h2) {
+    @apply text-2xl font-bold text-[#f1f5f9] mt-8 mb-4;
+  }
+
+  .prose :global(h3) {
+    @apply text-xl font-bold text-[#f1f5f9] mt-6 mb-3;
+  }
+
+  .prose :global(h4) {
+    @apply text-lg font-semibold text-[#f1f5f9] mt-4 mb-2;
+  }
+
+  .prose :global(p) {
+    @apply mb-4;
+  }
+
+  .prose :global(a) {
+    @apply text-[#3b82f6] hover:text-[#60a5fa] underline;
+  }
+
+  .prose :global(strong) {
+    @apply text-[#f1f5f9] font-semibold;
+  }
+
+  .prose :global(code) {
+    @apply font-mono text-sm bg-[#111827] px-1.5 py-0.5 rounded text-[#f1f5f9];
+  }
+
+  .prose :global(pre) {
+    @apply bg-[#111827] border border-[#1e293b] rounded-xl p-4 overflow-x-auto mb-4;
+  }
+
+  .prose :global(pre code) {
+    @apply bg-transparent px-0 py-0;
+  }
+
+  .prose :global(ul), .prose :global(ol) {
+    @apply mb-4 pl-6;
+  }
+
+  .prose :global(li) {
+    @apply mb-2;
+  }
+
+  .prose :global(blockquote) {
+    @apply border-l-4 border-[#3b82f6] pl-4 italic text-[#94a3b8] my-4;
+  }
+</style>

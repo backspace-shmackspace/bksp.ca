@@ -1,0 +1,48 @@
+---
+// build/index.astro - Build lane index page
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import LaneBadge from '../../components/LaneBadge.astro';
+import PostCard from '../../components/PostCard.astro';
+import { getCollection } from 'astro:content';
+
+// Get all build posts
+const allPosts = await getCollection('posts', ({ data }) => !data.draft && data.lane === 'build');
+const sortedPosts = allPosts.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+
+// Calculate reading times
+const postsWithReadingTime = sortedPosts.map((post) => ({
+  ...post,
+  readingTime: Math.ceil(post.body.split(/\s+/).length / 225)
+}));
+---
+
+<BaseLayout title="// Build" description="AI agent architecture, security tooling, and flow engineering.">
+  <div class="mb-8">
+    <LaneBadge lane="build" />
+    <h1 class="text-3xl font-bold text-[#f1f5f9] mt-4 mb-4">
+      Build
+    </h1>
+    <p class="text-lg text-[#94a3b8]">
+      AI agent architecture, security tooling, and flow engineering.
+    </p>
+  </div>
+
+  {postsWithReadingTime.length > 0 ? (
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {postsWithReadingTime.map((post) => (
+        <PostCard
+          title={post.data.title}
+          slug={post.slug}
+          date={post.data.date}
+          lane={post.data.lane}
+          description={post.data.description}
+          readingTime={post.readingTime}
+        />
+      ))}
+    </div>
+  ) : (
+    <div class="bg-[#111827] border border-[#1e293b] rounded-xl p-12 text-center">
+      <p class="text-[#64748b]">Coming soon</p>
+    </div>
+  )}
+</BaseLayout>

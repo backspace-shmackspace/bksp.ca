@@ -1,0 +1,60 @@
+---
+// tags/[tag].astro - Dynamic route for tag pages
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PostCard from '../../components/PostCard.astro';
+import { getCollection } from 'astro:content';
+
+export async function getStaticPaths() {
+  const allPosts = await getCollection('posts', ({ data }) => !data.draft);
+
+  // Collect all unique tags
+  const allTags = new Set<string>();
+  allPosts.forEach((post) => {
+    post.data.tags.forEach((tag) => allTags.add(tag));
+  });
+
+  // Generate a page for each tag
+  return Array.from(allTags).map((tag) => ({
+    params: { tag },
+    props: {
+      posts: allPosts.filter((post) => post.data.tags.includes(tag)),
+    },
+  }));
+}
+
+const { tag } = Astro.params;
+const { posts } = Astro.props;
+
+// Sort posts by date descending
+const sortedPosts = posts.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+
+// Calculate reading times
+const postsWithReadingTime = sortedPosts.map((post) => ({
+  ...post,
+  readingTime: Math.ceil(post.body.split(/\s+/).length / 225)
+}));
+---
+
+<BaseLayout title={`#${tag}`} description={`Posts tagged with ${tag}`}>
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold text-[#f1f5f9] mb-4">
+      #{tag}
+    </h1>
+    <p class="text-sm text-[#94a3b8]">
+      {postsWithReadingTime.length} {postsWithReadingTime.length === 1 ? 'post' : 'posts'}
+    </p>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {postsWithReadingTime.map((post) => (
+      <PostCard
+        title={post.data.title}
+        slug={post.slug}
+        date={post.data.date}
+        lane={post.data.lane}
+        description={post.data.description}
+        readingTime={post.readingTime}
+      />
+    ))}
+  </div>
+</BaseLayout>

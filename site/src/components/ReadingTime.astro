@@ -1,0 +1,16 @@
+---
+// ReadingTime.astro - Calculate and display reading time
+interface Props {
+  content: string;
+}
+
+const { content } = Astro.props;
+
+// Calculate word count and reading time (225 words per minute)
+const wordCount = content.trim().split(/\s+/).length;
+const readingTime = Math.ceil(wordCount / 225);
+---
+
+<span class="text-[#64748b] text-sm">
+  {readingTime} min read
+</span>

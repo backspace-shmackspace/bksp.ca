@@ -1,0 +1,19 @@
+---
+// TagList.astro - Renders clickable tag pills
+interface Props {
+  tags: string[];
+}
+
+const { tags } = Astro.props;
+---
+
+<div class="flex flex-wrap gap-2">
+  {tags.map((tag) => (
+    <a
+      href={`/tags/${tag}`}
+      class="text-xs px-2.5 py-1 rounded-full bg-[#1e293b] text-[#94a3b8] border border-[#334155] hover:text-[#f1f5f9] hover:border-[#94a3b8] transition-all duration-200"
+    >
+      {tag}
+    </a>
+  ))}
+</div>

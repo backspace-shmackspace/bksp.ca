@@ -1,0 +1,97 @@
+---
+// Header.astro - Sticky top navigation with glass morphism
+---
+
+<header class="sticky top-0 z-50 backdrop-blur-md bg-[#0a0f1a]/80 border-b border-[#1e293b]">
+  <nav class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+    <!-- Logo -->
+    <a href="/" class="font-bold text-xl text-[#f1f5f9] hover:text-white transition-colors duration-200">
+      bksp<span class="animate-blink">_</span>
+    </a>
+
+    <!-- Desktop Navigation -->
+    <div class="hidden md:flex items-center gap-8">
+      <a
+        href="/offense"
+        class="text-[#94a3b8] hover:text-[#ef4444] transition-colors duration-200 text-sm font-medium"
+      >
+        offense
+      </a>
+      <a
+        href="/defense"
+        class="text-[#94a3b8] hover:text-[#3b82f6] transition-colors duration-200 text-sm font-medium"
+      >
+        defense
+      </a>
+      <a
+        href="/build"
+        class="text-[#94a3b8] hover:text-[#8b5cf6] transition-colors duration-200 text-sm font-medium"
+      >
+        build
+      </a>
+      <a
+        href="/about"
+        class="text-[#94a3b8] hover:text-[#f1f5f9] transition-colors duration-200 text-sm font-medium"
+      >
+        about
+      </a>
+    </div>
+
+    <!-- Mobile Navigation -->
+    <details class="md:hidden group">
+      <summary class="list-none cursor-pointer text-[#94a3b8] hover:text-[#f1f5f9] transition-colors">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+        </svg>
+      </summary>
+      <div class="absolute right-6 mt-2 w-48 bg-[#111827] border border-[#1e293b] rounded-xl shadow-lg overflow-hidden">
+        <a
+          href="/offense"
+          class="block px-4 py-3 text-[#94a3b8] hover:text-[#ef4444] hover:bg-[#1e293b] transition-all duration-200 text-sm"
+        >
+          offense
+        </a>
+        <a
+          href="/defense"
+          class="block px-4 py-3 text-[#94a3b8] hover:text-[#3b82f6] hover:bg-[#1e293b] transition-all duration-200 text-sm"
+        >
+          defense
+        </a>
+        <a
+          href="/build"
+          class="block px-4 py-3 text-[#94a3b8] hover:text-[#8b5cf6] hover:bg-[#1e293b] transition-all duration-200 text-sm"
+        >
+          build
+        </a>
+        <a
+          href="/about"
+          class="block px-4 py-3 text-[#94a3b8] hover:text-[#f1f5f9] hover:bg-[#1e293b] transition-all duration-200 text-sm"
+        >
+          about
+        </a>
+      </div>
+    </details>
+  </nav>
+</header>
+
+<style>
+  @keyframes blink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+  }
+
+  .animate-blink {
+    animation: blink 1s infinite;
+  }
+
+  /* Close mobile menu when clicking outside */
+  details[open] summary::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: -1;
+  }
+</style>

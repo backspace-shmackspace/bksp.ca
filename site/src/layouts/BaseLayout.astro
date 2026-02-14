@@ -1,0 +1,35 @@
+---
+// BaseLayout.astro - Base HTML layout for all pages
+import '@fontsource/inter';
+import '@fontsource/jetbrains-mono';
+import '../styles/global.css';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import OpenGraph from '../components/OpenGraph.astro';
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description } = Astro.props;
+const pageTitle = `${title} | bksp_`;
+const pageDescription = description || 'Undoing what shouldn\'t have shipped';
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+    <OpenGraph title={pageTitle} description={pageDescription} />
+  </head>
+  <body class="bg-[#0a0f1a] text-[#f1f5f9] font-sans antialiased">
+    <Header />
+    <main class="max-w-4xl mx-auto px-6 py-12">
+      <slot />
+    </main>
+    <Footer />
+  </body>
+</html>

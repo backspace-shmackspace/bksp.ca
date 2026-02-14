@@ -1,0 +1,18 @@
+---
+// LaneBadge.astro - Small pill badge showing the content lane
+interface Props {
+  lane: 'offense' | 'defense' | 'build';
+}
+
+const { lane } = Astro.props;
+
+const laneStyles = {
+  offense: 'text-[#ef4444] bg-[#ef4444]/10 border-[#ef4444]/20',
+  defense: 'text-[#3b82f6] bg-[#3b82f6]/10 border-[#3b82f6]/20',
+  build: 'text-[#8b5cf6] bg-[#8b5cf6]/10 border-[#8b5cf6]/20'
+};
+---
+
+<span class={`text-xs font-mono font-medium px-3 py-1 rounded-full border inline-block ${laneStyles[lane]}`}>
+  // {lane}
+</span>

@@ -1,0 +1,24 @@
+---
+// OpenGraph.astro - Meta tags for Open Graph and Twitter Card
+interface Props {
+  title: string;
+  description: string;
+  url?: string;
+  type?: string;
+}
+
+const { title, description, url, type = 'article' } = Astro.props;
+const siteName = 'bksp_';
+---
+
+<!-- Open Graph -->
+<meta property="og:title" content={title} />
+<meta property="og:description" content={description} />
+<meta property="og:type" content={type} />
+<meta property="og:site_name" content={siteName} />
+{url && <meta property="og:url" content={url} />}
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={title} />
+<meta name="twitter:description" content={description} />

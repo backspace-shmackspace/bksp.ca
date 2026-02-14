@@ -1,0 +1,106 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-[#0a0f1a] text-[#f1f5f9] font-sans;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Prose styling for blog posts */
+  .prose {
+    @apply max-w-none;
+  }
+
+  .prose h1 {
+    @apply text-3xl font-bold text-[#f1f5f9] mt-10 mb-4;
+  }
+
+  .prose h2 {
+    @apply text-2xl font-bold text-[#f1f5f9] mt-8 mb-3;
+  }
+
+  .prose h3 {
+    @apply text-xl font-semibold text-[#f1f5f9] mt-6 mb-2;
+  }
+
+  .prose h4 {
+    @apply text-lg font-semibold text-[#f1f5f9] mt-4 mb-2;
+  }
+
+  .prose p {
+    @apply text-[#c8d1dc] leading-relaxed mb-4;
+  }
+
+  .prose a {
+    @apply text-[#3b82f6] hover:text-[#60a5fa] transition-colors duration-200 underline underline-offset-2;
+  }
+
+  .prose strong {
+    @apply text-[#f1f5f9] font-semibold;
+  }
+
+  .prose ul {
+    @apply list-disc list-inside mb-4 space-y-1 text-[#c8d1dc];
+  }
+
+  .prose ol {
+    @apply list-decimal list-inside mb-4 space-y-1 text-[#c8d1dc];
+  }
+
+  .prose li {
+    @apply leading-relaxed;
+  }
+
+  .prose blockquote {
+    @apply border-l-4 border-[#3b82f6] pl-4 py-1 my-4 text-[#94a3b8] italic bg-[#111827] rounded-r-lg;
+  }
+
+  .prose pre {
+    @apply bg-[#1e293b] rounded-lg border border-[#334155] p-4 overflow-x-auto my-4 font-mono text-sm;
+  }
+
+  .prose code {
+    @apply font-mono text-sm;
+  }
+
+  .prose :not(pre) > code {
+    @apply bg-[#1e293b] text-[#3b82f6] px-1.5 py-0.5 rounded border border-[#334155];
+  }
+
+  .prose hr {
+    @apply border-[#1e293b] my-8;
+  }
+
+  .prose table {
+    @apply w-full border-collapse my-4;
+  }
+
+  .prose th {
+    @apply bg-[#111827] border border-[#1e293b] px-4 py-2 text-left text-sm font-semibold text-[#f1f5f9];
+  }
+
+  .prose td {
+    @apply border border-[#1e293b] px-4 py-2 text-sm text-[#c8d1dc];
+  }
+
+  .prose img {
+    @apply rounded-lg my-4;
+  }
+}
+
+/* Blinking cursor animation for bksp_ logo */
+@keyframes blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+.animate-blink {
+  animation: blink 1s infinite;
+}
