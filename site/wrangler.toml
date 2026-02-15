@@ -1,2 +1,6 @@
 name = "bksp-ca"
 pages_build_output_dir = "dist"
+compatibility_date = "2026-02-14"
+
+[pages]
+project_name = "bksp-ca"
