@@ -26,15 +26,32 @@ const lanes = [
     description: 'AI agent architecture, security tooling, and flow engineering. Building automation that replaces risk registers with actual risk reduction.'
   }
 ];
+
+const career = [
+  { role: 'Product Security Risk Manager', company: 'Red Hat', period: '2025 - Present' },
+  { role: 'Program Director, QRadar SIEM & Suite', company: 'IBM', period: '2018 - 2025' },
+  { role: 'Director, Development & Business Development', company: 'Blue Spurs', period: '2013 - 2018' },
+  { role: 'Development Team Lead, R&D', company: 'BlackBerry', period: '2009 - 2013' },
+  { role: 'Senior Consultant', company: 'CGI', period: '2006 - 2009' },
+];
 ---
 
-<BaseLayout title="About" description="20+ years in software engineering and engineering management. Now applying engineering discipline to security risk management.">
+<BaseLayout title="About" description="Music graduate turned security engineering leader. Top 10 HackTheBox Hall of Fame. Building AI agents for risk management.">
   <!-- Bio Section -->
   <section class="mb-16">
     <h1 class="text-3xl font-bold text-[#f1f5f9] mb-6">About</h1>
-    <div class="prose prose-invert max-w-none">
-      <p class="text-lg text-[#94a3b8] leading-relaxed">
-        20+ years in software engineering and engineering management. Now applying engineering discipline to security risk management. Omniscient-ranked ethical hacker. Building AI agents that do what risk registers won't.
+    <div class="space-y-4">
+      <p class="text-lg text-[#c8d1dc] leading-relaxed">
+        I started with a music degree. Not computer science, not engineering — a Bachelor of Music in Performance from Mount Allison University. I still perform — most recently as Uncle Vanya with Next Folding Theatre Company. Music and theatre taught me how to read a room, tell a story, and commit fully to a role. Those skills turned out to be more useful in technology than any certification I've earned since.
+      </p>
+      <p class="text-lg text-[#c8d1dc] leading-relaxed">
+        Over two decades, I moved from consulting to BlackBerry R&D (where I shipped a patent), to leading the teams that built IBM's QRadar Cloud-Native SIEM and the watsonx-powered QRadar Investigation Assistant. Along the way, I landed in the Top 10 on HackTheBox's global Hall of Fame — because I believe you can't defend what you haven't learned to break.
+      </p>
+      <p class="text-lg text-[#c8d1dc] leading-relaxed">
+        Now I work in product security risk management, applying engineering discipline to problems that most organizations solve with spreadsheets and good intentions. I build AI agents that automate risk assessment, and I treat the risk register like a production system — not a filing cabinet.
+      </p>
+      <p class="text-[#94a3b8] leading-relaxed">
+        I speak English and French natively, tech and exec fluently. I'm at ease in front of a 6-person meeting or a 1,000-seat auditorium. I'm always studying something — right now it's multi-agent AI orchestration and EU Cyber Resilience Act compliance.
       </p>
     </div>
   </section>
@@ -42,6 +59,24 @@ const lanes = [
   <!-- HackTheBox Stats -->
   <section class="mb-16">
     <HtbStats />
+  </section>
+
+  <!-- Career Timeline -->
+  <section class="mb-16">
+    <h2 class="text-2xl font-bold text-[#f1f5f9] mb-6">Career</h2>
+    <div class="space-y-4">
+      {career.map((item) => (
+        <div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 py-3 border-b border-[#1e293b]">
+          <span class="text-sm text-[#64748b] sm:w-36 shrink-0">{item.period}</span>
+          <div>
+            <span class="text-[#f1f5f9] font-medium">{item.role}</span>
+            <span class="text-[#64748b]"> · </span>
+            <span class="text-[#94a3b8]">{item.company}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+    <p class="text-xs text-[#64748b] mt-4">B.Mus. (Performance), Mount Allison University · US Patent 20120314849</p>
   </section>
 
   <!-- Content Lanes -->
@@ -80,9 +115,6 @@ const lanes = [
         rel="noopener noreferrer"
         class="inline-flex items-center gap-2 bg-[#111827] border border-[#1e293b] rounded-lg px-4 py-2 text-sm text-[#94a3b8] hover:text-[#f1f5f9] hover:border-[#334155] transition-all duration-200"
       >
-        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M11.996 0a1.119 1.119 0 0 0-.057.002a1.119 1.119 0 0 0-.794.347L.517 10.977a1.119 1.119 0 0 0 0 1.588l10.628 10.628a1.119 1.119 0 0 0 1.588 0l10.628-10.628a1.119 1.119 0 0 0 0-1.588L12.733.349a1.119 1.119 0 0 0-.737-.349zm-.21 3.525l8.47 8.47l-8.47 8.47l-8.47-8.47z"/>
-        </svg>
         HackTheBox
       </a>
       <a
@@ -91,10 +123,7 @@ const lanes = [
         rel="noopener noreferrer"
         class="inline-flex items-center gap-2 bg-[#111827] border border-[#1e293b] rounded-lg px-4 py-2 text-sm text-[#94a3b8] hover:text-[#f1f5f9] hover:border-[#334155] transition-all duration-200"
       >
-        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M13.54 12a6.8 6.8 0 01-6.77 6.82A6.8 6.8 0 010 12a6.8 6.8 0 016.77-6.82A6.8 6.8 0 0113.54 12zM20.96 12c0 3.54-1.51 6.42-3.38 6.42-1.87 0-3.39-2.88-3.39-6.42s1.52-6.42 3.39-6.42 3.38 2.88 3.38 6.42M24 12c0 3.17-.53 5.75-1.19 5.75-.66 0-1.19-2.58-1.19-5.75s.53-5.75 1.19-5.75C23.47 6.25 24 8.83 24 12z"/>
-        </svg>
-        Medium
+        InfoSec Write-ups
       </a>
       <a
         href="https://www.linkedin.com/in/ian-murphy-nb/"
@@ -102,9 +131,6 @@ const lanes = [
         rel="noopener noreferrer"
         class="inline-flex items-center gap-2 bg-[#111827] border border-[#1e293b] rounded-lg px-4 py-2 text-sm text-[#94a3b8] hover:text-[#f1f5f9] hover:border-[#334155] transition-all duration-200"
       >
-        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-        </svg>
         LinkedIn
       </a>
       <a
@@ -113,9 +139,6 @@ const lanes = [
         rel="noopener noreferrer"
         class="inline-flex items-center gap-2 bg-[#111827] border border-[#1e293b] rounded-lg px-4 py-2 text-sm text-[#94a3b8] hover:text-[#f1f5f9] hover:border-[#334155] transition-all duration-200"
       >
-        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-        </svg>
         GitHub
       </a>
     </div>
