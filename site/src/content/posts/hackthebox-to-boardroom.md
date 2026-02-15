@@ -80,13 +80,13 @@ graph TD
     D2 --> E2[Domain Controller<br/>Domain Admin]
     end
 
-    style A1 fill:#ff6b6b
-    style B1 fill:#ffa500
-    style C1 fill:#00ff00
+    style A1 fill:#dc2626,stroke:#ef4444,stroke-width:2px,color:#fff
+    style B1 fill:#2563eb,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style C1 fill:#16a34a,stroke:#22c55e,stroke-width:2px,color:#fff
 
-    style A2 fill:#ff6b6b
-    style C2 fill:#ffa500
-    style E2 fill:#00ff00
+    style A2 fill:#dc2626,stroke:#ef4444,stroke-width:2px,color:#fff
+    style C2 fill:#2563eb,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style E2 fill:#16a34a,stroke:#22c55e,stroke-width:2px,color:#fff
 ```
 
 Enterprise risk works the same way. A single vulnerability in isolation might be medium-severity. But chain it with a missing logging control and an unmonitored service account, and you've got a path from initial access to domain admin. Most risk programs evaluate each risk in isolation, filed by the team that found it, reviewed in a silo. Nobody maps the chain.
