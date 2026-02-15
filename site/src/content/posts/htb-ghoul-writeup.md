@@ -271,4 +271,4 @@ And you're done!!! Happy hacking!
 
 *Originally published on [InfoSec Write-ups](https://medium.com/bugbountywriteup/hackthebox-writeup-ghoul-ca5913f3)*
 
-`bksp_ // undoing what shouldn't have shipped`
+`bksp_ // enumerate. prove. document.`

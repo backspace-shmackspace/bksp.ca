@@ -159,9 +159,7 @@ The underscore as cursor. Backspace just deleted something — the cursor is wai
 
 ### Tagline Options
 
-- `bksp_ // undoing what shouldn't have shipped`
-- `bksp_ // delete. correct. rewrite.`
-- `bksp_ // the key nobody presses soon enough`
+- `bksp_ // enumerate. prove. document.`
 
 ### Content Lanes
 

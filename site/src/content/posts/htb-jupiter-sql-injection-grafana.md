@@ -339,4 +339,4 @@ Connection: close
 
 *Originally published on [InfoSec Write-ups](https://medium.com/bugbountywriteup/sql-injection-by-default-in-grafana-htb-jupiter-6b7b8825fdaa)*
 
-`bksp_ // undoing what shouldn't have shipped`
+`bksp_ // enumerate. prove. document.`

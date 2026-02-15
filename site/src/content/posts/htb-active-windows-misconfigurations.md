@@ -180,4 +180,4 @@ This machine is an excellent introduction to the core concepts involved in pente
 
 *Originally published on [InfoSec Write-ups](https://medium.com/bugbountywriteup/abusing-common-windows-misconfigurations-hackthebox-active-8aca6a8ee6b7)*
 
-`bksp_ // undoing what shouldn't have shipped`
+`bksp_ // enumerate. prove. document.`

@@ -65,4 +65,4 @@ The risk register is just another box. Root it.
 
 ---
 
-`bksp_ // undoing what shouldn't have shipped`
+`bksp_ // enumerate. prove. document.`
