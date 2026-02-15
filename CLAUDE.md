@@ -77,7 +77,8 @@ Validated by Zod in `site/src/content/config.ts`. Build will fail if frontmatter
 |---|---|---|
 | `/mine` | `.claude/skills/mine/` | Mine journals for content pitches (3-5 per session) |
 | `/pitch-review` | `.claude/skills/pitch-review/` | Browse, approve, develop, or kill pitches |
-| `/review [path]` | `.claude/skills/review/` | Run sensitivity review before publishing |
+| `/review [path]` | `.claude/skills/review/` | Editorial + visual + sensitivity review (copy-editor + visual-designer + sensitivity-reviewer) |
+| `/illustrate [path]` | `.claude/skills/illustrate/` | Generate visual specs (diagrams, charts, hero images) without full review |
 | `/repurpose [path]` | `.claude/skills/repurpose/` | Transform content across formats |
 | `/publish [path]` | `.claude/skills/publish/` | Build, deploy, commit, push |
 
@@ -88,6 +89,8 @@ Validated by Zod in `site/src/content/config.ts`. Build will fail if frontmatter
 | Agent | Location | Role |
 |---|---|---|
 | **content-miner** | `.claude/agents/content-miner.md` | Digs through journals for story ideas |
+| **copy-editor** | `.claude/agents/copy-editor.md` | Editorial review for hooks, voice, engagement, and callouts |
+| **visual-designer** | `.claude/agents/visual-designer.md` | Identifies visual opportunities and specs diagrams/graphics |
 | **sensitivity-reviewer** | `.claude/agents/sensitivity-reviewer.md` | Pre-publish anonymization gate |
 | **repurposer** | `.claude/agents/repurposer.md` | Blog → LinkedIn, HTB → defenders, etc. |
 | **publisher** | `.claude/agents/publisher.md` | Build/deploy/commit workflow |

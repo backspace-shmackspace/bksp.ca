@@ -1,3 +1,8 @@
+---
+name: pitch-review
+description: Browse, approve, develop, or kill content pitches.
+model: sonnet
+---
 # /pitch-review — Review and Manage Pitches
 
 Browse, approve, or develop existing content pitches.

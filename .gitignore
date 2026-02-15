@@ -2,3 +2,9 @@ trees/
 node_modules/
 dist/
 .astro/
+
+# Obsidian
+.obsidian/
+.obsidian.vimrc
+.trash/
+.DS_Store

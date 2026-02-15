@@ -73,6 +73,41 @@ Reference Ian's voice profile from the master persona:
 
 **The influencer test:** Read the piece in the voice of someone who posts "I'm humbled to announce" unironically. If it fits, the piece has a voice problem.
 
+### 6. CALLOUT IDENTIFICATION (Blog posts only)
+
+Identify 3-5 snippets that should be highlighted as callouts/blockquotes in the final published piece. Think pull quotes in news articles—lines that make readers stop scrolling.
+
+**What makes a good callout:**
+- **Quotable insight:** A single sentence that captures a key principle or surprising finding
+- **Data punch:** A striking statistic or comparison that demands attention
+- **Provocative claim:** A contrarian statement that challenges conventional thinking
+- **Actionable takeaway:** A concrete "do this, not that" recommendation
+
+**Format requirements:**
+- Self-contained (makes sense out of context)
+- 1-2 sentences maximum
+- Specific, not vague
+- Would work as a social media quote card
+- Ideally contains numbers, contrast, or tension
+
+**Examples of good callouts:**
+- "Temperature 0.3 caused 52% variance. Temperature 0.1 reduced it to 15%. Same model, same inputs—just one parameter."
+- "In multi-agent systems, the architecture IS the training."
+- "We ran the same risk assessment twice. One took 19 minutes. The other took 29 minutes. The only difference? A single configuration parameter."
+- "The scanner converted 'no control exists' to 'detective control in place' for four compliance frameworks. That's the difference between an audit gap and an audit finding."
+
+**Anti-patterns (do NOT suggest):**
+- Vague statements ("Quality matters")
+- Throat-clearing ("It's important to understand that...")
+- Generic advice ("Measure what matters")
+- Anything requiring context from earlier paragraphs
+
+**Your task:**
+1. Identify 3-5 potential callouts from the draft
+2. Quote them exactly as they appear (or suggest minor edits to make them punchier)
+3. Explain why each would work as a callout
+4. Note where in the piece they appear (e.g., "Section 3, paragraph 2")
+
 ---
 
 ## Review Output Format
@@ -96,6 +131,19 @@ Structure every review as follows:
 
 ### Voice Alignment
 [Does this sound like Ian or like generic thought leadership?]
+
+### Suggested Callouts (Blog posts only)
+[Identify 3-5 quotable snippets that should be highlighted as blockquotes/callouts]
+
+1. **"[Exact quote]"** (Section X, paragraph Y)
+   - Why it works: [Brief explanation]
+   - Type: [Pull quote / Data punch / Provocative claim / Actionable takeaway]
+
+2. **"[Exact quote]"** (Section X, paragraph Y)
+   - Why it works: [Brief explanation]
+   - Type: [Pull quote / Data punch / Provocative claim / Actionable takeaway]
+
+[Continue for 3-5 callouts total]
 
 ### Top 3 Issues (Ranked by Impact)
 1. [The single biggest thing hurting this piece]

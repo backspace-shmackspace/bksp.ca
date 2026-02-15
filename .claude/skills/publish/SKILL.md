@@ -1,3 +1,8 @@
+---
+name: publish
+description: Build, deploy, commit, and push content to bksp.ca.
+model: sonnet
+---
 # /publish — Build, Deploy, and Commit
 
 Publish content to bksp.ca.

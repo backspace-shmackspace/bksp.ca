@@ -1,3 +1,8 @@
+---
+name: repurpose
+description: Transform content across formats (Blog → LinkedIn, HTB → defenders, etc.).
+model: sonnet
+---
 # /repurpose — Transform Content Across Formats
 
 Take a piece of content and create derivative versions for other platforms.

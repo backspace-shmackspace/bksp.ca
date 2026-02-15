@@ -1,3 +1,8 @@
+---
+name: mine
+description: Mine journals for content pitches (3-5 per session).
+model: sonnet
+---
 # /mine — Content Mining
 
 Mine journal entries and work logs for content ideas.
