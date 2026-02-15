@@ -34,6 +34,18 @@ const pageDescription = description || 'Undoing what shouldn\'t have shipped';
     <Footer />
     <script type="module">
       import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+
+      // Convert syntax-highlighted mermaid code blocks to mermaid divs
+      document.querySelectorAll('pre[data-language="mermaid"]').forEach((pre) => {
+        const code = pre.querySelector('code');
+        if (code) {
+          const mermaidDiv = document.createElement('div');
+          mermaidDiv.className = 'mermaid';
+          mermaidDiv.textContent = code.textContent;
+          pre.replaceWith(mermaidDiv);
+        }
+      });
+
       mermaid.initialize({
         startOnLoad: true,
         theme: 'dark',
