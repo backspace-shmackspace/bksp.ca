@@ -32,5 +32,22 @@ const pageDescription = description || 'Undoing what shouldn\'t have shipped';
       <slot />
     </main>
     <Footer />
+    <script type="module">
+      import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+      mermaid.initialize({
+        startOnLoad: true,
+        theme: 'dark',
+        themeVariables: {
+          darkMode: true,
+          background: '#0a0f1a',
+          primaryColor: '#3b82f6',
+          primaryTextColor: '#f1f5f9',
+          primaryBorderColor: '#475569',
+          lineColor: '#64748b',
+          secondaryColor: '#1e293b',
+          tertiaryColor: '#334155',
+        }
+      });
+    </script>
   </body>
 </html>
