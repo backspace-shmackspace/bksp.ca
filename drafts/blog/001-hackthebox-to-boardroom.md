@@ -14,12 +14,31 @@
 
 My first week in risk management, I opened the risk register and found critical-severity tickets with no evidence, no quantified impact, no definition of what remediation would look like, and no owner. Some had been open for over a year. The comment history was a graveyard of good intentions — people agreeing the risk was important, committing to action, then going silent.
 
+```mermaid
+gantt
+    title Risk Ticket Lifecycle - Typical Enterprise Pattern
+    dateFormat YYYY-MM-DD
+    section Critical Risk
+    Created (No owner, no evidence)      :crit, 2025-01-01, 365d
+    Comment: "This is important"         :milestone, 2025-01-30, 0d
+    Comment: "Still on our radar"        :milestone, 2025-06-15, 0d
+    Comment: "Any updates?"              :milestone, 2025-12-01, 0d
+    Status: Still Open                   :active, 2025-12-31, 1d
+```
+
 I'd been spending my nights on HackTheBox — practicing breaking into systems with real tools and real methodology. In that world, this would be like running nmap, seeing port 80 open, typing "this could be bad" into your notes, and moving on to the next box.
 
 
 ### The Mapping
 
 The methodology I use to root an HTB machine maps almost exactly to what's missing from most enterprise risk programs.
+
+| HTB Methodology | Enterprise Risk Management | Current Gap |
+|---|---|---|
+| **Enumeration before assumption**<br/>Port scan, service detection, define attack surface with specificity | **Evidence-based scoping**<br/>Document affected systems, quantify exposure, define scope precisely | ⚠️ "We think this is medium-severity"<br/>(intuition, not data) |
+| **Proof before claims**<br/>Show the shell, data exfiltration, privilege escalation | **Quantified impact**<br/>Affected user count, regulatory framework, documented incidents | ⚠️ "Could result in significant exposure"<br/>(claim without evidence) |
+| **Documentation that reproduces**<br/>Walkthrough methodology, show dead ends, enable reproduction | **Reproducible analysis**<br/>Evidence trail, methodology shown, severity derivation documented | ⚠️ "Severity: High. Fix it."<br/>(conclusion without reasoning) |
+| **Chains, not silos**<br/>Pivot through attack paths, map lateral movement | **Attack chain mapping**<br/>Link vulnerabilities across systems, map exploitation paths | ⚠️ Each risk evaluated in isolation<br/>(no chain analysis) |
 
 **Enumeration before assumption**
 
@@ -50,6 +69,29 @@ That writeup would get roasted in the community. But that's what passes for risk
 This is where HTB Pro Labs changed how I think about risk.
 
 On a single HTB machine, exploitation is usually linear: foothold → user → root. But in a Pro Lab — a simulated enterprise network — you pivot. You take credentials from one machine and use them to move laterally. You escalate from a web server to a domain controller through a chain of misconfigurations that no single team would have caught.
+
+```mermaid
+graph TD
+    subgraph "Single HTB Machine - Linear"
+    A1[Foothold] --> B1[User]
+    B1 --> C1[Root]
+    end
+
+    subgraph "Pro Lab Network - Attack Chain"
+    A2[Web Server<br/>Initial Access] --> B2[Credential Dump]
+    B2 --> C2[File Server<br/>Lateral Movement]
+    C2 --> D2[Service Account<br/>Privilege Discovery]
+    D2 --> E2[Domain Controller<br/>Domain Admin]
+    end
+
+    style A1 fill:#ff6b6b
+    style B1 fill:#ffa500
+    style C1 fill:#00ff00
+
+    style A2 fill:#ff6b6b
+    style C2 fill:#ffa500
+    style E2 fill:#00ff00
+```
 
 Enterprise risk works the same way. A single vulnerability in isolation might be medium-severity. But chain it with a missing logging control and an unmonitored service account, and you've got a path from initial access to domain admin. Most risk programs evaluate each risk in isolation, filed by the team that found it, reviewed in a silo. Nobody maps the chain.
 
