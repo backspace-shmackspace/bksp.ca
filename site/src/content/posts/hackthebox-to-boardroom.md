@@ -67,26 +67,17 @@ This is where HTB Pro Labs changed how I think about risk.
 On a single HTB machine, exploitation is usually linear: foothold → user → root. But in a Pro Lab — a simulated enterprise network — you pivot. You take credentials from one machine and use them to move laterally. You escalate from a web server to a domain controller through a chain of misconfigurations that no single team would have caught.
 
 ```mermaid
-graph TD
-    subgraph "Single HTB Machine - Linear"
-    A1[Foothold] --> B1[User]
-    B1 --> C1[Root]
-    end
+graph LR
+    A[Web Server<br/>Initial Access] --> B[Credential Dump]
+    B --> C[File Server<br/>Lateral Movement]
+    C --> D[Service Account<br/>Privilege Discovery]
+    D --> E[Domain Controller<br/>Domain Admin]
 
-    subgraph "Pro Lab Network - Attack Chain"
-    A2[Web Server<br/>Initial Access] --> B2[Credential Dump]
-    B2 --> C2[File Server<br/>Lateral Movement]
-    C2 --> D2[Service Account<br/>Privilege Discovery]
-    D2 --> E2[Domain Controller<br/>Domain Admin]
-    end
-
-    style A1 fill:#dc2626,stroke:#ef4444,stroke-width:2px,color:#fff
-    style B1 fill:#2563eb,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style C1 fill:#16a34a,stroke:#22c55e,stroke-width:2px,color:#fff
-
-    style A2 fill:#dc2626,stroke:#ef4444,stroke-width:2px,color:#fff
-    style C2 fill:#2563eb,stroke:#3b82f6,stroke-width:2px,color:#fff
-    style E2 fill:#16a34a,stroke:#22c55e,stroke-width:2px,color:#fff
+    style A fill:#dc2626,stroke:#ef4444,stroke-width:2px,color:#fff
+    style B fill:#2563eb,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style C fill:#2563eb,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style D fill:#2563eb,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style E fill:#16a34a,stroke:#22c55e,stroke-width:2px,color:#fff
 ```
 
 Enterprise risk works the same way. A single vulnerability in isolation might be medium-severity. But chain it with a missing logging control and an unmonitored service account, and you've got a path from initial access to domain admin. Most risk programs evaluate each risk in isolation, filed by the team that found it, reviewed in a silo. Nobody maps the chain.
