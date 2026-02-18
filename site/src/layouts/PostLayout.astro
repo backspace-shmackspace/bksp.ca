@@ -30,7 +30,7 @@ const wordCount = content.split(/\s+/).length;
 const readingTime = Math.ceil(wordCount / 225);
 
 // Get all posts for prev/next navigation
-const allPosts = await getCollection('posts', ({ data }) => !data.draft);
+const allPosts = await getCollection('posts', ({ data }) => import.meta.env.DEV || !data.draft);
 const sortedPosts = allPosts.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
 const currentIndex = sortedPosts.findIndex((post) => post.data.title === frontmatter.title);
 const prevPost = currentIndex > 0 ? sortedPosts[currentIndex - 1] : null;
@@ -147,5 +147,21 @@ const nextPost = currentIndex < sortedPosts.length - 1 ? sortedPosts[currentInde
 
   .prose :global(blockquote) {
     @apply border-l-4 border-[#3b82f6] pl-4 italic text-[#94a3b8] my-4;
+  }
+
+  .prose :global(table) {
+    @apply w-full border-collapse mb-6;
+  }
+
+  .prose :global(th) {
+    @apply text-left text-[#f1f5f9] font-semibold text-sm px-4 py-2 border-b-2 border-[#334155] bg-[#111827];
+  }
+
+  .prose :global(td) {
+    @apply text-sm px-4 py-2 border-b border-[#1e293b];
+  }
+
+  .prose :global(tr:hover) {
+    @apply bg-[#111827]/50;
   }
 </style>

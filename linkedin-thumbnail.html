@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>bksp_ LinkedIn Thumbnail</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: #1a1a1a;
+    }
+
+    .thumbnail {
+      width: 1200px;
+      height: 630px;
+      background: #0a0f1a;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 60px;
+      position: relative;
+    }
+
+    .logo {
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      font-size: 120px;
+      color: #f1f5f9;
+      letter-spacing: -2px;
+    }
+
+    .tagline {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 400;
+      font-size: 48px;
+      color: #3b82f6;
+      letter-spacing: 1px;
+    }
+
+    .lanes {
+      font-family: 'Inter', sans-serif;
+      font-weight: 400;
+      font-size: 36px;
+      color: #64748b;
+      letter-spacing: 2px;
+    }
+
+    .instructions {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      background: rgba(0,0,0,0.8);
+      color: white;
+      padding: 20px;
+      font-family: sans-serif;
+      font-size: 14px;
+      border-radius: 8px;
+      max-width: 300px;
+    }
+  </style>
+</head>
+<body>
+  <div class="instructions">
+    <strong>Instructions:</strong><br>
+    1. Open this file in Chrome/Firefox<br>
+    2. Press F11 for fullscreen (or Cmd+Shift+F on Mac)<br>
+    3. Take a screenshot of just the dark rectangle<br>
+    4. Crop to 1200x630px if needed<br>
+    5. Save as PNG<br>
+    <br>
+    <em>This instruction box won't appear in the screenshot if you crop correctly.</em>
+  </div>
+
+  <div class="thumbnail">
+    <div class="logo">bksp_</div>
+    <div class="tagline">// enumerate. prove. document.</div>
+    <div class="lanes">Offense • Defense • Build</div>
+  </div>
+</body>
+</html>

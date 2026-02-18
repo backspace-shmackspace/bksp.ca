@@ -9,7 +9,7 @@
 
 ---
 
-A commitment without a resource allocation is just a neglected meeting outcome.
+If nobody's working on it, it's not a commitment—it's theater.
 
 In engineering, a critical production bug that sits unresolved for months gets escalated, gets people reassigned, gets fixed. In risk management, I found critical-severity tickets that had been cycling through the same pattern for over a year — sometimes approaching two — with no sustained remediation.
 

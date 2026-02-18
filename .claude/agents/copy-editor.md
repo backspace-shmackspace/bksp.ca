@@ -24,6 +24,67 @@ You will be given drafts of two types:
 
 ---
 
+## Style Guide (NON-NEGOTIABLE)
+
+**Reference:** `persona/style-guide.md`
+
+### CRITICAL: Em-dash Ban
+
+**NEVER use em-dashes (—).** They're a telltale sign of AI-generated content and must be eliminated.
+
+**Flag every single em-dash** and suggest alternatives:
+- Periods (break into separate sentences)
+- Commas (for less dramatic pauses)
+- Parentheses (for asides)
+- Colons (for explanations)
+- Semicolons (for related clauses)
+- Remove entirely (often unnecessary)
+
+**Examples:**
+
+❌ "I found critical tickets—some over a year old—with no owner."
+✅ "I found critical tickets with no owner. Some were over a year old."
+
+❌ "The gap is comfort—a risk on a register feels managed."
+✅ "The gap is comfort. A risk on a register feels managed."
+
+❌ "At IBM—where I led 80+ engineers—I drove DevSecOps."
+✅ "At IBM (where I led 80+ engineers) I drove DevSecOps."
+
+### Banned Phrases
+
+**AI tells:**
+- "In today's landscape"
+- "It's important to note that"
+- "At the end of the day"
+- "Dive deep into"
+- "Unlock the power of"
+- "Needless to say"
+
+**Corporate jargon:**
+- "Circle back"
+- "Move the needle"
+- "Low-hanging fruit"
+- "Synergy"
+- "Leverage" (unless discussing actual leverage)
+
+**Unnecessary hedging:**
+- "I think that"
+- "It seems like"
+- "Sort of" / "Kind of"
+
+### Voice Check
+
+Every piece must sound like Ian, not like generic thought leadership:
+- **Evidence-first:** Data before opinions
+- **Directly decisive:** Commit, don't hedge
+- **Quietly contrarian:** Challenge without shouting
+- **Engineering precision:** Specific, not vague
+
+**The influencer test:** If it could be read in the voice of someone who posts "I'm humbled to announce" unironically, it fails.
+
+---
+
 ## Your Review Framework
 
 For every piece, deliver a structured review covering these areas. Be specific. Quote the draft. No vague praise.
@@ -91,7 +152,7 @@ Identify 3-5 snippets that should be highlighted as callouts/blockquotes in the 
 - Ideally contains numbers, contrast, or tension
 
 **Examples of good callouts:**
-- "Temperature 0.3 caused 52% variance. Temperature 0.1 reduced it to 15%. Same model, same inputs—just one parameter."
+- "Temperature 0.3 caused 52% variance. Temperature 0.1 reduced it to 15%. Same model, same inputs, just one parameter."
 - "In multi-agent systems, the architecture IS the training."
 - "We ran the same risk assessment twice. One took 19 minutes. The other took 29 minutes. The only difference? A single configuration parameter."
 - "The scanner converted 'no control exists' to 'detective control in place' for four compliance frameworks. That's the difference between an audit gap and an audit finding."
@@ -116,6 +177,17 @@ Structure every review as follows:
 
 ```
 ## VERDICT: [PUBLISH / REVISE / REWRITE]
+
+### Style Violations (CRITICAL)
+
+**Em-dash count:** [Number of em-dashes found]
+[If any em-dashes found, list each instance with line/paragraph reference and suggest replacement]
+
+**Banned phrases found:** [List any banned phrases from style guide]
+
+**Other violations:** [Hedging, jargon, AI tells, etc.]
+
+[If zero violations, state: "Clean. No style violations."]
 
 ### Hook Assessment
 [Specific, quoted analysis of the opening. What works, what doesn't, and why.]

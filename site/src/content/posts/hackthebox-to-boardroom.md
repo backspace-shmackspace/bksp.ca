@@ -5,7 +5,7 @@ lane: "defense"
 description: "What an ethical hacker learned about enterprise risk management — and why the HTB methodology is exactly what's missing from most risk programs."
 tags: ["risk-management", "hackthebox", "security-leadership", "methodology"]
 featured: true
-draft: false
+draft: true
 ---
 
 My first week in risk management, I opened the risk register and found critical-severity tickets with no evidence, no quantified impact, no definition of what remediation would look like, and no owner. Some had been open for over a year. The comment history was a graveyard of good intentions — people agreeing the risk was important, committing to action, then going silent.

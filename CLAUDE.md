@@ -23,6 +23,35 @@ cd ~/bksp && git push origin main
 **GitHub remote uses SSH alias:** `git@github-personal:backspace-shmackspace/bksp.ca.git`
 This routes through the `github-personal` host in `~/.ssh/config` to the backspace-shmackspace account (not imurphy-rh).
 
+## Ian's Professional Background (CRITICAL CONTEXT)
+
+**Full CV:** `reference/ian-murphy-cv.md`
+
+**Career Arc:**
+- **1998-2010:** Software developer → consultant → analyst
+- **2010-2024:** Team management → program management (managed 80+ engineers at IBM)
+- **2024-Present:** Product Security Risk Manager at Red Hat
+
+**Key Facts:**
+- **Never been a professional offensive security practitioner** — HTB is a hobby (active 2019, last box 2023)
+- **Hasn't written code for a living since 2010** — has been managing teams for 15+ years
+- **IBM experience (2018-2024):** Program Director for QRadar SIEM/Suite, Development Manager for CloudPak for Security
+- **Core expertise:** DevSecOps, PSIRT, vulnerability management, secure SDLC, team leadership, agile delivery
+- **Sales experience:** 2 years in business development role at Blue Spurs Consulting
+- **Current focus:** Applying engineering discipline to risk management, building AI agents for risk operations
+
+**What NOT to say:**
+- ❌ "Ethical hacker turned risk manager"
+- ❌ "Offensive security practitioner"
+- ❌ "Software engineer" (hasn't coded professionally in 15+ years)
+- ❌ Over-indexing on HTB credentials (it's hobby context, not professional identity)
+
+**What TO say:**
+- ✅ "Technical leader with 20+ years in software and cybersecurity"
+- ✅ "Program director who managed 80+ engineers at IBM Security"
+- ✅ "DevSecOps and PSIRT background, now in risk management"
+- ✅ "Practiced offensive security as a hobby to understand how systems break"
+
 ## Content Architecture
 
 ### Three Lanes
@@ -128,13 +157,27 @@ Ian works at Red Hat. All content must be anonymized before publishing. Key rule
 
 Full protocol in `persona/master-persona.md`.
 
-## Voice (Two Registers)
+## Voice & Style (CRITICAL)
+
+**Style Guide:** `persona/style-guide.md` (READ THIS BEFORE WRITING ANYTHING)
+
+### BANNED: Em-dashes (—)
+Never use em-dashes. They're a telltale sign of AI-generated content. Use periods, commas, parentheses, colons, or semicolons instead.
+
+### Two Registers
 
 **Register 1 — "The Walkthrough":** Conversational, tutorial-style. "Let's see what we can do." For HTB writeups and technical content.
 
 **Register 2 — "The Analysis":** Structured, evidence-first, data-backed. For LinkedIn posts and risk management pieces.
 
+### Voice Principles
+- Evidence-first (data before opinions)
+- Directly decisive (commit, don't hedge)
+- Quietly contrarian (challenge without shouting)
+- Engineering precision (specific, not vague)
+
 Full voice guide in `persona/master-persona.md`.
+Full style guide in `persona/style-guide.md`.
 
 ## Social Links
 
