@@ -1,6 +1,6 @@
 # LinkedIn Post #2: Quantify or Kill
 
-**Status:** DRAFT
+**Status:** READY TO POST (style guide compliant)
 **Created:** 2026-02-14
 **Target:** LinkedIn (text post)
 **Register:** 2 (analytical/authority)
@@ -18,9 +18,7 @@ When I moved from engineering into risk, I brought a rule with me:
 
 **Quantify or kill. Two weeks.**
 
-Here's how it works:
-
-**Quantify:** Gather concrete evidence that makes the risk tangible. Not "this could be bad" — but specific data. How many systems are affected? What's the actual exposure? Can you show three real examples? If you can produce evidence, you now have an actionable risk with a measurable scope. Assign an owner, set acceptance criteria, allocate resources, track it like a production incident.
+**Quantify:** Gather concrete evidence that makes the risk tangible. Not "this could be bad." Specific data: How many systems are affected? What's the actual exposure? Can you show three real examples? If you can produce evidence, assign an owner, set acceptance criteria, and track it like a production incident.
 
 **Kill:** If two weeks of focused evidence gathering doesn't yield actionable scope, close the ticket. Not "defer." Not "move to monitoring." Close it. Write a one-paragraph rationale and move on.
 
@@ -28,7 +26,7 @@ Why two weeks? Because poorly-scoped risks are attention sinks. Every minute spe
 
 The pushback I get from career risk managers: "But what if we close it and something happens?"
 
-My answer: What's happening RIGHT NOW while this vaguely-defined ticket consumes meeting time and mental bandwidth? The risks you're neglecting because your register is full of noise — those are the ones that will bite you.
+My answer: What's happening RIGHT NOW while this vaguely-defined ticket consumes meeting time and mental bandwidth? The risks you're neglecting because your register is full of noise? Those are the ones that will bite you.
 
 A risk register isn't a collection of everything that might go wrong. It's a prioritized queue of quantified threats with owners and deadlines. Anything that can't meet that standard is noise.
 
