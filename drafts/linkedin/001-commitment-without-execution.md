@@ -1,6 +1,7 @@
 # LinkedIn Post #1: Risk Register Dysfunction
 
-**Status:** DRAFT
+**Status:** POSTED (week of 2026-02-17)
+**Performance (6 days):** 1,147 impressions, 20 reactions, 1 comment
 **Created:** 2026-02-14
 **Target:** LinkedIn (text post)
 **Register:** 2 (analytical/authority)
