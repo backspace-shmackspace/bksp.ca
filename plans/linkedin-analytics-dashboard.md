@@ -17,7 +17,7 @@
 - `plans/bksp-ca-astro-cloudflare-blog.md` (APPROVED): Established the Astro/Tailwind/Cloudflare stack for bksp.ca. This plan is a separate project (not part of bksp.ca) but follows the same design sensibilities (dark theme, Inter/JetBrains Mono fonts) for visual consistency.
 
 ### Deviations with Justification
-- **Separate repository:** This dashboard is not part of the bksp.ca Astro site. It is a standalone Python + Docker project. Rationale: different runtime (Python backend + scheduled jobs), different deployment target (local Docker / Proxmox), and different data flow (file ingestion, not static site generation).
+- **Separate directory within bksp.ca repo:** This dashboard lives alongside the Astro site but is a standalone Python + Docker project. Rationale: different runtime (Python backend), different deployment target (local Docker / Proxmox), and different data flow (file ingestion, not static site generation). Shares the `backspace-shmackspace/bksp.ca` upstream repo for simplicity.
 - **Python stack (not Astro):** Astro is a static site generator. This project needs a backend for data storage, scheduled ingestion, and a dynamic dashboard. Python with Flask/FastAPI and SQLite is the simplest self-contained stack for a home lab tool.
 
 ---
@@ -104,7 +104,7 @@ LinkedIn provides manual CSV/XLS exports for personal profiles with analytics en
 3. Exports will be done manually (weekly or bi-weekly cadence)
 4. The dashboard will initially run on Ian's Mac, with a path to Proxmox deployment
 5. Python 3.12+ is available for local development
-6. The project will live in its own repository under the `backspace-shmackspace` GitHub org (not in the bksp.ca repo)
+6. The project will live in its own repository under the `backspace-shmackspace/bksp.ca` repo (alongside the Astro site)
 
 ## Proposed Design
 
@@ -533,7 +533,7 @@ linkedin-analytics/
 
 ### Files to Modify
 
-None. This is a greenfield project in a new repository (`backspace-shmackspace/linkedin-analytics` on GitHub).
+None. This is a greenfield project in a new repository (`backspace-shmackspace/bksp.ca` on GitHub, under the `linkedin-analytics/` directory).
 
 ### Implementation Order
 
@@ -622,7 +622,7 @@ For deployment on Proxmox with Docker:
 
 No special Proxmox configuration is needed beyond standard Docker networking.
 
-## Status: DRAFT (revised 2026-02-28 to address red team, review, and feasibility findings)
+## Status: APPROVED
 
 ---
 
@@ -645,5 +645,3 @@ claude_md_exists: true
 recent_plans_consulted: bksp-ca-astro-cloudflare-blog.md
 archived_plans_consulted: none
 -->
-
-## Status: APPROVED
