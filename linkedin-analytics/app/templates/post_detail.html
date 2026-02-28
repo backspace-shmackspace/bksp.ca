@@ -56,6 +56,19 @@
           <span class="font-mono text-xs text-text-dim">ID: {{ post.linkedin_post_id }}</span>
         {% endif %}
       </div>
+      <!-- Draft linking -->
+      <div class="flex items-center gap-2 mt-2">
+        <label class="text-xs text-text-dim">Draft #</label>
+        <input type="text" id="draftIdInput" value="{{ post.draft_id or '' }}"
+               placeholder="e.g. 001"
+               class="bg-white/5 border border-white/10 rounded px-2 py-0.5 text-xs text-text font-mono w-20
+                      focus:outline-none focus:border-accent/50">
+        <button onclick="saveDraftId()" id="saveDraftBtn"
+                class="text-xs bg-accent/20 hover:bg-accent/30 text-accent px-2 py-0.5 rounded transition-colors">
+          Link
+        </button>
+        <span id="draftSaveStatus" class="text-xs text-success hidden">Saved</span>
+      </div>
     </div>
     <div class="text-right shrink-0">
       <div class="text-2xl font-mono font-semibold
@@ -122,5 +135,34 @@
     {% endif %}
   };
   initPostDetail(postConfig);
+
+  async function saveDraftId() {
+    const input = document.getElementById("draftIdInput");
+    const status = document.getElementById("draftSaveStatus");
+    const btn = document.getElementById("saveDraftBtn");
+    const draftId = input.value.trim();
+    btn.disabled = true;
+    btn.textContent = "...";
+    try {
+      const resp = await fetch(`/api/posts/{{ post.id }}?draft_id=${encodeURIComponent(draftId)}`, {method: "PATCH"});
+      if (resp.ok) {
+        const data = await resp.json();
+        status.classList.remove("hidden");
+        status.textContent = "Saved";
+        // Update the page title
+        document.querySelector("h2").textContent = data.display_title;
+        setTimeout(() => status.classList.add("hidden"), 2000);
+      } else {
+        status.classList.remove("hidden");
+        status.textContent = "Error";
+        status.classList.replace("text-success", "text-warning");
+      }
+    } catch(e) {
+      status.classList.remove("hidden");
+      status.textContent = "Failed";
+    }
+    btn.disabled = false;
+    btn.textContent = "Link";
+  }
 </script>
 {% endblock %}

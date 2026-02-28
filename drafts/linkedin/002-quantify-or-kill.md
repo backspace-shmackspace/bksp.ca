@@ -1,6 +1,8 @@
 # LinkedIn Post #2: Quantify or Kill
 
-**Status:** READY TO POST (style guide compliant)
+**Status:** POSTED (week of 2026-02-24)
+**LinkedIn Activity ID:** 7432392249344274432
+**LinkedIn URL:** https://www.linkedin.com/feed/update/urn:li:activity:7432392249344274432
 **Created:** 2026-02-14
 **Target:** LinkedIn (text post)
 **Register:** 2 (analytical/authority)

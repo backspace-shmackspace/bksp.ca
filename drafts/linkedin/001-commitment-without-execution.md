@@ -1,6 +1,8 @@
 # LinkedIn Post #1: Risk Register Dysfunction
 
 **Status:** POSTED (week of 2026-02-17)
+**LinkedIn Activity ID:** 7429858006156320769
+**LinkedIn URL:** https://www.linkedin.com/feed/update/urn:li:activity:7429858006156320769
 **Performance (6 days):** 1,147 impressions, 20 reactions, 1 comment
 **Created:** 2026-02-14
 **Target:** LinkedIn (text post)

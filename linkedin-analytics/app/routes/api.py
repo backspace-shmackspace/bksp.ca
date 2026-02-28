@@ -345,6 +345,42 @@ async def followers_trend(
 
 
 # ---------------------------------------------------------------------------
+# Post update (draft linking)
+# ---------------------------------------------------------------------------
+
+
+@router.patch("/api/posts/{post_id}")
+async def update_post(
+    post_id: int,
+    draft_id: str = Query(None, max_length=20),
+    title: str = Query(None, max_length=100),
+    db: Session = Depends(get_session),
+):
+    """Update a post's draft_id or title.
+
+    Used to link dashboard posts to draft files in the bksp.ca repo.
+    """
+    post = db.query(Post).filter_by(id=post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    if draft_id is not None:
+        post.draft_id = draft_id if draft_id else None
+    if title is not None:
+        post.title = title if title else None
+
+    db.commit()
+    db.refresh(post)
+
+    return {
+        "id": post.id,
+        "draft_id": post.draft_id,
+        "title": post.title,
+        "display_title": post.display_title,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Database export
 # ---------------------------------------------------------------------------
 
