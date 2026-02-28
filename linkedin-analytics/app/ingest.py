@@ -3,22 +3,24 @@
 Parses XLS/XLSX exports from LinkedIn's creator analytics page,
 deduplicates records, and loads them into the SQLite database.
 
-Format assumptions (PROVISIONAL - based on third-party docs, not a verified export):
-  Sheet "DISCOVERY"   -> daily impressions per date
-  Sheet "ENGAGEMENT"  -> per-post reactions, comments, shares, clicks
-  Sheet "TOP POSTS"   -> top posts with aggregate metrics
-  Sheet "FOLLOWERS"   -> daily follower snapshots
-  Sheet "DEMOGRAPHICS"-> audience breakdown by category
+Verified format (from real LinkedIn Premium export, Feb 2026):
+  Sheet "DISCOVERY"    -> Summary row: "Impressions" + value, "Members reached" + value
+  Sheet "ENGAGEMENT"   -> Daily totals: Date | Impressions | Engagements
+  Sheet "TOP POSTS"    -> Two side-by-side tables: Engagements (A-C) and Impressions (E-G)
+                          Each has: Post URL | Post publish date | metric value
+  Sheet "FOLLOWERS"    -> Header row at row 3: Date | New followers. Total at B1.
+  Sheet "DEMOGRAPHICS" -> Structured: Category (col A) | Value (col B) | Percentage (col C)
 """
 
 import hashlib
 import logging
+import re
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
-import pandas as pd
+import openpyxl
 from sqlalchemy.orm import Session
 
 from app.models import DailyMetric, DemographicSnapshot, FollowerSnapshot, Post, Upload
@@ -31,7 +33,7 @@ MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024
 # Allowed file extensions
 ALLOWED_EXTENSIONS = {".xlsx", ".xls", ".csv"}
 
-# Sheet names expected in the LinkedIn export (PROVISIONAL)
+# Sheet names expected in the LinkedIn export
 SHEET_DISCOVERY = "DISCOVERY"
 SHEET_ENGAGEMENT = "ENGAGEMENT"
 SHEET_TOP_POSTS = "TOP POSTS"
@@ -121,39 +123,21 @@ def validate_upload(file_path: Path) -> None:
         )
 
 
-def _detect_engine(file_path: Path) -> str:
-    """Detect which pandas Excel engine to use based on file extension.
-
-    Args:
-        file_path: Path to the file.
-
-    Returns:
-        Engine name string for pandas.read_excel().
-    """
-    suffix = file_path.suffix.lower()
-    if suffix == ".xlsx":
-        return "openpyxl"
-    if suffix == ".xls":
-        return "xlrd"
-    # Treat .csv separately; this function only handles Excel
-    raise IngestError(f"Cannot determine Excel engine for extension '{suffix}'.")
-
-
 def _safe_int(value: Any, default: int = 0) -> int:
     """Convert a value to int, returning default on failure."""
+    if value is None:
+        return default
     try:
-        if pd.isna(value):
-            return default
-        return int(value)
+        return int(float(value))
     except (ValueError, TypeError):
         return default
 
 
 def _safe_float(value: Any, default: float = 0.0) -> float:
     """Convert a value to float, returning default on failure."""
+    if value is None:
+        return default
     try:
-        if pd.isna(value):
-            return default
         return float(value)
     except (ValueError, TypeError):
         return default
@@ -168,7 +152,7 @@ def _parse_date(value: Any) -> date | None:
     if isinstance(value, datetime):
         return value.date()
     if isinstance(value, str):
-        for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y", "%Y/%m/%d"):
+        for fmt in ("%m/%d/%Y", "%Y-%m-%d", "%d/%m/%Y", "%Y/%m/%d"):
             try:
                 return datetime.strptime(value.strip(), fmt).date()
             except ValueError:
@@ -176,249 +160,276 @@ def _parse_date(value: Any) -> date | None:
     return None
 
 
-def _load_sheets(file_path: Path) -> dict[str, pd.DataFrame]:
-    """Load all sheets from an Excel file or a single CSV.
+def _extract_activity_id(url: str) -> str | None:
+    """Extract the LinkedIn activity ID from a post URL.
 
-    Args:
-        file_path: Path to the file.
-
-    Returns:
-        Dict mapping sheet name -> DataFrame. For CSV files, the
-        single sheet is keyed by the file stem.
+    Example: https://www.linkedin.com/feed/update/urn:li:activity:7432392249344274432
+    Returns: "7432392249344274432"
     """
-    suffix = file_path.suffix.lower()
-    if suffix == ".csv":
-        df = pd.read_csv(file_path, dtype=str)
-        return {file_path.stem.upper(): df}
-
-    engine = _detect_engine(file_path)
-    xl = pd.ExcelFile(file_path, engine=engine)
-    sheets: dict[str, pd.DataFrame] = {}
-    for sheet_name in xl.sheet_names:
-        try:
-            df = xl.parse(sheet_name, dtype=str)
-            sheets[sheet_name.strip().upper()] = df
-        except Exception as exc:
-            logger.warning("Could not parse sheet '%s': %s", sheet_name, exc)
-    return sheets
+    if not url:
+        return None
+    match = re.search(r"urn:li:activity:(\d+)", str(url))
+    return match.group(1) if match else None
 
 
-def _parse_discovery_sheet(df: pd.DataFrame, warnings: list[str]) -> list[dict]:
-    """Parse DISCOVERY sheet into daily account-level metrics.
+def _load_workbook(file_path: Path) -> openpyxl.Workbook:
+    """Load an Excel workbook using openpyxl with data_only mode.
 
-    Expected columns (PROVISIONAL): Date, Impressions, Members Reached
+    Must use read_only=False because LinkedIn exports have unreliable
+    dimension metadata (max_col=1 in read_only mode).
+    """
+    return openpyxl.load_workbook(file_path, read_only=False, data_only=True)
+
+
+def _get_sheet(wb: openpyxl.Workbook, name: str) -> Any | None:
+    """Get a worksheet by name (case-insensitive)."""
+    for sheet_name in wb.sheetnames:
+        if sheet_name.strip().upper() == name.upper():
+            return wb[sheet_name]
+    return None
+
+
+def _parse_discovery_sheet(ws: Any, warnings: list[str]) -> dict[str, int]:
+    """Parse DISCOVERY sheet into summary metrics.
+
+    Real format (verified):
+      A1: "Overall Performance"   B1: "2/22/2026 - 2/28/2026"
+      A2: "Impressions"           B2: 1491
+      A3: "Members reached"       B3: 875
+    """
+    summary: dict[str, int] = {}
+    for row in ws.iter_rows(min_row=1, max_row=ws.max_row, values_only=False):
+        label = row[0].value
+        value = row[1].value if len(row) > 1 else None
+        if label and value is not None:
+            key = str(label).strip().upper()
+            if key == "IMPRESSIONS":
+                summary["impressions"] = _safe_int(value)
+            elif key == "MEMBERS REACHED":
+                summary["members_reached"] = _safe_int(value)
+    return summary
+
+
+def _parse_engagement_sheet(ws: Any, warnings: list[str]) -> list[dict]:
+    """Parse ENGAGEMENT sheet into daily account-level metrics.
+
+    Real format (verified):
+      Row 1: Date | Impressions | Engagements
+      Row 2+: date values with daily totals
     """
     records: list[dict] = []
-    col_map = {c.strip().upper(): c for c in df.columns}
+    header_row = None
 
-    date_col = col_map.get("DATE")
-    impressions_col = col_map.get("IMPRESSIONS")
+    for row in ws.iter_rows(min_row=1, max_row=ws.max_row, values_only=False):
+        cells = [c.value for c in row]
+        if not cells or cells[0] is None:
+            continue
 
-    if not date_col:
-        warnings.append("DISCOVERY sheet: 'Date' column not found. Skipping sheet.")
-        return records
+        # Find the header row
+        if str(cells[0]).strip().upper() == "DATE":
+            header_row = [str(c).strip().upper() if c else "" for c in cells]
+            continue
 
-    for idx, row in df.iterrows():
-        row_date = _parse_date(row.get(date_col))
+        if header_row is None:
+            continue
+
+        row_date = _parse_date(cells[0])
         if not row_date:
             continue
 
-        record: dict[str, Any] = {
+        impressions = _safe_int(cells[1]) if len(cells) > 1 else 0
+        engagements = _safe_int(cells[2]) if len(cells) > 2 else 0
+
+        records.append({
             "metric_date": row_date,
             "post_id": None,
-            "impressions": _safe_int(row.get(impressions_col, 0)) if impressions_col else 0,
-            "members_reached": _safe_int(row.get(col_map.get("MEMBERS REACHED", ""), 0)),
-        }
-        records.append(record)
+            "impressions": impressions,
+            "engagements": engagements,
+        })
 
     return records
 
 
-def _parse_engagement_sheet(df: pd.DataFrame, warnings: list[str]) -> list[dict]:
-    """Parse ENGAGEMENT sheet into per-post engagement metrics.
+def _parse_top_posts_sheet(ws: Any, warnings: list[str]) -> list[dict]:
+    """Parse TOP POSTS sheet into post records.
 
-    Expected columns (PROVISIONAL): Post Title, Post Date/Published, Impressions,
-    Reactions, Comments, Shares, Clicks
+    Real format (verified): two side-by-side tables.
+      Row 1: "Maximum of 50 posts available..."
+      Row 2: (empty)
+      Row 3: Post URL | Post publish date | Engagements | (gap) | Post URL | Post publish date | Impressions
+      Row 4+: data rows
+
+    Left table (cols A-C): top posts by engagements
+    Right table (cols E-G): top posts by impressions
+    We merge them by post URL to get both metrics per post.
     """
-    records: list[dict] = []
-    col_map = {c.strip().upper(): c for c in df.columns}
+    records_by_url: dict[str, dict[str, Any]] = {}
+    data_started = False
 
-    # Try several common column name variants for the date field
-    date_col = (
-        col_map.get("POST DATE")
-        or col_map.get("DATE")
-        or col_map.get("PUBLISHED")
-        or col_map.get("POST PUBLISHED DATE")
-    )
+    for row in ws.iter_rows(min_row=1, max_row=ws.max_row, values_only=False):
+        cells = [c.value for c in row]
 
-    if not date_col:
-        warnings.append("ENGAGEMENT sheet: date column not found. Skipping sheet.")
-        return records
-
-    title_col = col_map.get("POST TITLE") or col_map.get("TITLE") or col_map.get("POST TEXT")
-
-    for idx, row in df.iterrows():
-        row_date = _parse_date(row.get(date_col))
-        if not row_date:
+        # Find the header row (contains "Post URL")
+        if not data_started:
+            if cells[0] and str(cells[0]).strip().upper() == "POST URL":
+                data_started = True
             continue
 
-        title_raw = str(row.get(title_col, "")) if title_col else ""
-        title = title_raw.strip()[:100] if title_raw else None
+        # Left table: engagement data (cols A-C)
+        url_left = str(cells[0]).strip() if cells[0] else ""
+        if url_left and url_left.startswith("http"):
+            activity_id = _extract_activity_id(url_left)
+            pub_date = _parse_date(cells[1]) if len(cells) > 1 else None
+            engagements = _safe_int(cells[2]) if len(cells) > 2 else 0
 
-        impressions = _safe_int(row.get(col_map.get("IMPRESSIONS", ""), 0))
-        reactions = _safe_int(row.get(col_map.get("REACTIONS", ""), 0))
-        comments = _safe_int(row.get(col_map.get("COMMENTS", ""), 0))
-        shares = _safe_int(row.get(col_map.get("SHARES", ""), 0))
-        clicks = _safe_int(row.get(col_map.get("CLICKS", ""), 0))
-        members_reached = _safe_int(row.get(col_map.get("MEMBERS REACHED", ""), 0))
+            if activity_id and pub_date:
+                if activity_id not in records_by_url:
+                    records_by_url[activity_id] = {
+                        "linkedin_post_id": activity_id,
+                        "post_url": url_left,
+                        "post_date": pub_date,
+                        "impressions": 0,
+                        "engagements": engagements,
+                    }
+                else:
+                    records_by_url[activity_id]["engagements"] = engagements
 
-        engagement_rate = 0.0
-        if impressions > 0:
-            engagement_rate = (reactions + comments + shares) / impressions
+        # Right table: impressions data (cols E-G, index 4-6)
+        if len(cells) > 4:
+            url_right = str(cells[4]).strip() if cells[4] else ""
+            if url_right and url_right.startswith("http"):
+                activity_id = _extract_activity_id(url_right)
+                pub_date = _parse_date(cells[5]) if len(cells) > 5 else None
+                impressions = _safe_int(cells[6]) if len(cells) > 6 else 0
 
-        record: dict[str, Any] = {
-            "post_date": row_date,
-            "title": title,
+                if activity_id and pub_date:
+                    if activity_id not in records_by_url:
+                        records_by_url[activity_id] = {
+                            "linkedin_post_id": activity_id,
+                            "post_url": url_right,
+                            "post_date": pub_date,
+                            "impressions": impressions,
+                            "engagements": 0,
+                        }
+                    else:
+                        records_by_url[activity_id]["impressions"] = impressions
+
+    # Convert to post records
+    posts: list[dict] = []
+    for record in records_by_url.values():
+        impressions = record.get("impressions", 0)
+        engagements = record.get("engagements", 0)
+        engagement_rate = engagements / impressions if impressions > 0 else 0.0
+
+        posts.append({
+            "post_date": record["post_date"],
+            "title": None,
+            "linkedin_post_id": record["linkedin_post_id"],
             "impressions": impressions,
-            "reactions": reactions,
-            "comments": comments,
-            "shares": shares,
-            "clicks": clicks,
-            "members_reached": members_reached,
+            "reactions": engagements,  # LinkedIn lumps all engagements together
+            "comments": 0,
+            "shares": 0,
+            "clicks": 0,
+            "members_reached": 0,
             "engagement_rate": engagement_rate,
             "post_type": None,
-            "linkedin_post_id": None,
-        }
+        })
 
-        # Extract LinkedIn post ID if present (e.g. from a URL column)
-        post_id_col = col_map.get("POST ID") or col_map.get("LINKEDIN POST ID")
-        if post_id_col:
-            raw_id = str(row.get(post_id_col, "")).strip()
-            if raw_id and raw_id != "nan":
-                record["linkedin_post_id"] = raw_id
-
-        post_type_col = col_map.get("POST TYPE") or col_map.get("TYPE") or col_map.get("CONTENT TYPE")
-        if post_type_col:
-            raw_type = str(row.get(post_type_col, "")).strip()
-            if raw_type and raw_type != "nan":
-                record["post_type"] = raw_type
-
-        records.append(record)
-
-    return records
+    return posts
 
 
-def _parse_top_posts_sheet(df: pd.DataFrame, warnings: list[str]) -> list[dict]:
-    """Parse TOP POSTS sheet.
-
-    TOP POSTS often has the same columns as ENGAGEMENT but is filtered to
-    the best-performing posts. Reuse the same parsing logic.
-    """
-    return _parse_engagement_sheet(df, warnings)
-
-
-def _parse_followers_sheet(df: pd.DataFrame, warnings: list[str]) -> list[dict]:
+def _parse_followers_sheet(ws: Any, warnings: list[str]) -> list[dict]:
     """Parse FOLLOWERS sheet into follower snapshots.
 
-    Expected columns (PROVISIONAL): Date, Total Followers, New Followers
+    Real format (verified):
+      Row 1: "Total followers on 2/28/2026:" | 1506
+      Row 2: (empty)
+      Row 3: "Date" | "New followers"
+      Row 4+: date | new_followers_count
     """
     records: list[dict] = []
-    col_map = {c.strip().upper(): c for c in df.columns}
+    total_followers: int = 0
+    header_found = False
 
-    date_col = col_map.get("DATE")
-    total_col = (
-        col_map.get("TOTAL FOLLOWERS")
-        or col_map.get("FOLLOWERS")
-        or col_map.get("TOTAL")
-    )
+    for row in ws.iter_rows(min_row=1, max_row=ws.max_row, values_only=False):
+        cells = [c.value for c in row]
+        if not cells or cells[0] is None:
+            continue
 
-    if not date_col:
-        warnings.append("FOLLOWERS sheet: 'Date' column not found. Skipping sheet.")
-        return records
+        label = str(cells[0]).strip()
 
-    if not total_col:
-        warnings.append("FOLLOWERS sheet: total followers column not found. Skipping sheet.")
-        return records
+        # Extract total followers from row 1
+        if label.upper().startswith("TOTAL FOLLOWERS"):
+            total_followers = _safe_int(cells[1]) if len(cells) > 1 else 0
+            continue
 
-    new_col = col_map.get("NEW FOLLOWERS") or col_map.get("NET NEW FOLLOWERS")
+        # Find the header row
+        if label.upper() == "DATE":
+            header_found = True
+            continue
 
-    for idx, row in df.iterrows():
-        row_date = _parse_date(row.get(date_col))
+        if not header_found:
+            continue
+
+        row_date = _parse_date(cells[0])
         if not row_date:
             continue
 
-        total = _safe_int(row.get(total_col, 0))
-        if total == 0:
-            continue
+        new_followers = _safe_int(cells[1]) if len(cells) > 1 else 0
 
-        records.append(
-            {
-                "snapshot_date": row_date,
-                "total_followers": total,
-                "new_followers": _safe_int(row.get(new_col, 0)) if new_col else 0,
-            }
-        )
+        records.append({
+            "snapshot_date": row_date,
+            "total_followers": total_followers,
+            "new_followers": new_followers,
+        })
+
+    if not records and total_followers > 0:
+        warnings.append("FOLLOWERS sheet: no daily data rows found.")
 
     return records
 
 
-def _parse_demographics_sheet(df: pd.DataFrame, warnings: list[str]) -> list[dict]:
+def _parse_demographics_sheet(ws: Any, warnings: list[str]) -> list[dict]:
     """Parse DEMOGRAPHICS sheet into demographic snapshots.
 
-    Expected layout (PROVISIONAL): multiple blocks per category.
-    Each block has a header row (category name) followed by value/percentage rows.
+    Real format (verified):
+      Row 1: "Top Demographics" | "Value" | "Percentage"
+      Row 2+: category (col A) | value (col B) | percentage as float (col C)
+      Categories repeat per row: "Job titles", "Locations", "Industries",
+      "Seniority", "Company size", "Companies"
     """
     records: list[dict] = []
     snapshot_date = date.today()
-    col_map = {c.strip().upper(): c for c in df.columns}
+    header_found = False
 
-    # Try structured columns first (category, value, percentage)
-    cat_col = col_map.get("CATEGORY")
-    val_col = col_map.get("VALUE") or col_map.get("SEGMENT")
-    pct_col = col_map.get("PERCENTAGE") or col_map.get("%")
-
-    if cat_col and val_col and pct_col:
-        for idx, row in df.iterrows():
-            category = str(row.get(cat_col, "")).strip()
-            value = str(row.get(val_col, "")).strip()
-            pct = _safe_float(row.get(pct_col, 0.0))
-            if category and value and category.lower() != "nan" and value.lower() != "nan":
-                records.append(
-                    {
-                        "snapshot_date": snapshot_date,
-                        "category": category.lower(),
-                        "value": value,
-                        "percentage": pct,
-                    }
-                )
-        return records
-
-    # Fall back to heuristic parsing: detect category headers and data rows
-    current_category: str | None = None
-    for idx, row in df.iterrows():
-        row_values = [str(v).strip() for v in row.values if str(v).strip() and str(v).strip() != "nan"]
-        if not row_values:
+    for row in ws.iter_rows(min_row=1, max_row=ws.max_row, values_only=False):
+        cells = [c.value for c in row]
+        if not cells or cells[0] is None:
             continue
 
-        # Single non-numeric cell = category header
-        if len(row_values) == 1 and not row_values[0].replace(".", "").replace("%", "").isnumeric():
-            current_category = row_values[0].lower()
+        label = str(cells[0]).strip()
+
+        # Skip the header row
+        if label.upper() in ("TOP DEMOGRAPHICS", "CATEGORY"):
+            header_found = True
             continue
 
-        if current_category and len(row_values) >= 2:
-            label = row_values[0]
-            try:
-                pct = float(row_values[1].replace("%", "").strip())
-            except ValueError:
-                continue
-            records.append(
-                {
-                    "snapshot_date": snapshot_date,
-                    "category": current_category,
-                    "value": label,
-                    "percentage": pct,
-                }
-            )
+        if not header_found:
+            continue
+
+        category = label.lower()
+        value = str(cells[1]).strip() if len(cells) > 1 and cells[1] else ""
+        pct = _safe_float(cells[2]) if len(cells) > 2 else 0.0
+
+        if not value:
+            continue
+
+        records.append({
+            "snapshot_date": snapshot_date,
+            "category": category,
+            "value": value,
+            "percentage": pct,
+        })
 
     if not records:
         warnings.append("DEMOGRAPHICS sheet: could not parse any demographic records.")
@@ -442,63 +453,71 @@ def parse_linkedin_export(file_path: Path) -> ParsedExport:
 
     result = ParsedExport()
 
+    # CSV files are accepted but cannot be parsed as LinkedIn exports
+    # (LinkedIn always exports .xlsx). Return empty result with a warning.
+    if file_path.suffix.lower() == ".csv":
+        result.warnings.append("CSV files are accepted but LinkedIn exports are .xlsx. No data parsed.")
+        return result
+
     try:
-        sheets = _load_sheets(file_path)
+        wb = _load_workbook(file_path)
     except Exception as exc:
         raise IngestError(f"Failed to read file '{file_path.name}': {exc}") from exc
 
-    if not sheets:
-        raise IngestError("No sheets found in file.")
-
-    sheet_names = set(sheets.keys())
+    sheet_names = [s.strip().upper() for s in wb.sheetnames]
     logger.info("Loaded sheets: %s", sorted(sheet_names))
 
-    # DISCOVERY sheet -> daily account-level metrics
-    if SHEET_DISCOVERY in sheet_names:
-        result.daily_metrics.extend(
-            _parse_discovery_sheet(sheets[SHEET_DISCOVERY], result.warnings)
-        )
-    else:
-        result.warnings.append(f"Sheet '{SHEET_DISCOVERY}' not found.")
+    if not sheet_names:
+        wb.close()
+        raise IngestError("No sheets found in file.")
 
-    # ENGAGEMENT sheet -> posts
-    if SHEET_ENGAGEMENT in sheet_names:
-        result.posts.extend(
-            _parse_engagement_sheet(sheets[SHEET_ENGAGEMENT], result.warnings)
-        )
-    elif SHEET_TOP_POSTS in sheet_names:
-        result.warnings.append(
-            f"Sheet '{SHEET_ENGAGEMENT}' not found; falling back to '{SHEET_TOP_POSTS}'."
-        )
+    try:
+        # DISCOVERY sheet -> summary metrics (stored as info, not daily rows)
+        ws = _get_sheet(wb, SHEET_DISCOVERY)
+        if ws:
+            summary = _parse_discovery_sheet(ws, result.warnings)
+            if summary:
+                logger.info("Discovery summary: %s", summary)
+        else:
+            result.warnings.append(f"Sheet '{SHEET_DISCOVERY}' not found.")
 
-    # TOP POSTS sheet -> merge into posts (dedup by date+title during DB load)
-    if SHEET_TOP_POSTS in sheet_names:
-        top_posts = _parse_top_posts_sheet(sheets[SHEET_TOP_POSTS], result.warnings)
-        # Add only records not already captured by ENGAGEMENT sheet
-        existing_keys = {
-            (p["post_date"], p["title"]) for p in result.posts
-        }
-        for record in top_posts:
-            key = (record["post_date"], record["title"])
-            if key not in existing_keys:
-                result.posts.append(record)
-                existing_keys.add(key)
+        # ENGAGEMENT sheet -> daily account-level metrics
+        ws = _get_sheet(wb, SHEET_ENGAGEMENT)
+        if ws:
+            result.daily_metrics.extend(
+                _parse_engagement_sheet(ws, result.warnings)
+            )
+        else:
+            result.warnings.append(f"Sheet '{SHEET_ENGAGEMENT}' not found.")
 
-    # FOLLOWERS sheet -> follower snapshots
-    if SHEET_FOLLOWERS in sheet_names:
-        result.follower_snapshots.extend(
-            _parse_followers_sheet(sheets[SHEET_FOLLOWERS], result.warnings)
-        )
-    else:
-        result.warnings.append(f"Sheet '{SHEET_FOLLOWERS}' not found.")
+        # TOP POSTS sheet -> individual post records with URLs
+        ws = _get_sheet(wb, SHEET_TOP_POSTS)
+        if ws:
+            result.posts.extend(
+                _parse_top_posts_sheet(ws, result.warnings)
+            )
+        else:
+            result.warnings.append(f"Sheet '{SHEET_TOP_POSTS}' not found.")
 
-    # DEMOGRAPHICS sheet -> demographic snapshots
-    if SHEET_DEMOGRAPHICS in sheet_names:
-        result.demographic_snapshots.extend(
-            _parse_demographics_sheet(sheets[SHEET_DEMOGRAPHICS], result.warnings)
-        )
-    else:
-        result.warnings.append(f"Sheet '{SHEET_DEMOGRAPHICS}' not found.")
+        # FOLLOWERS sheet -> follower snapshots
+        ws = _get_sheet(wb, SHEET_FOLLOWERS)
+        if ws:
+            result.follower_snapshots.extend(
+                _parse_followers_sheet(ws, result.warnings)
+            )
+        else:
+            result.warnings.append(f"Sheet '{SHEET_FOLLOWERS}' not found.")
+
+        # DEMOGRAPHICS sheet -> demographic snapshots
+        ws = _get_sheet(wb, SHEET_DEMOGRAPHICS)
+        if ws:
+            result.demographic_snapshots.extend(
+                _parse_demographics_sheet(ws, result.warnings)
+            )
+        else:
+            result.warnings.append(f"Sheet '{SHEET_DEMOGRAPHICS}' not found.")
+    finally:
+        wb.close()
 
     logger.info(
         "Parsed: %d posts, %d daily metrics, %d follower snapshots, %d demographic records",

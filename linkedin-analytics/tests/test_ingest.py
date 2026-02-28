@@ -90,10 +90,10 @@ class TestParseLinkedinExport:
     def test_parse_sample_xlsx(self, sample_xlsx_path):
         result = parse_linkedin_export(sample_xlsx_path)
         assert isinstance(result, ParsedExport)
-        assert len(result.posts) >= 5
-        assert len(result.daily_metrics) > 0
-        assert len(result.follower_snapshots) > 0
-        assert len(result.demographic_snapshots) > 0
+        assert len(result.posts) == 5
+        assert len(result.daily_metrics) == 30
+        assert len(result.follower_snapshots) == 30
+        assert len(result.demographic_snapshots) == 20
 
     def test_posts_have_required_fields(self, sample_xlsx_path):
         result = parse_linkedin_export(sample_xlsx_path)
@@ -101,17 +101,16 @@ class TestParseLinkedinExport:
             assert "post_date" in post
             assert isinstance(post["post_date"], date)
             assert post.get("impressions", 0) >= 0
+            assert post.get("linkedin_post_id") is not None
 
     def test_engagement_rate_calculated(self, sample_xlsx_path):
         result = parse_linkedin_export(sample_xlsx_path)
         for post in result.posts:
             impressions = post.get("impressions", 0)
             if impressions > 0:
-                expected = (
-                    post.get("reactions", 0)
-                    + post.get("comments", 0)
-                    + post.get("shares", 0)
-                ) / impressions
+                # In real format, "reactions" holds the total engagements value
+                engagements = post.get("reactions", 0)
+                expected = engagements / impressions
                 assert post["engagement_rate"] == pytest.approx(expected, rel=1e-3)
 
     def test_missing_discovery_sheet_warns_not_crashes(self, tmp_path):
@@ -119,21 +118,21 @@ class TestParseLinkedinExport:
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = "ENGAGEMENT"
-        ws.append(["Post Date", "Post Title", "Impressions", "Reactions", "Comments", "Shares", "Clicks"])
-        ws.append(["2025-11-01", "Test post", 1000, 50, 10, 5, 20])
+        ws.append(["Date", "Impressions", "Engagements"])
+        ws.append(["11/1/2025", 1000, 50])
         out = tmp_path / "partial.xlsx"
         wb.save(out)
 
         result = parse_linkedin_export(out)
         assert any("DISCOVERY" in w for w in result.warnings)
-        assert len(result.posts) == 1
+        assert len(result.daily_metrics) == 1
 
     def test_missing_followers_sheet_warns_not_crashes(self, tmp_path):
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = "DISCOVERY"
-        ws.append(["Date", "Impressions"])
-        ws.append(["2025-11-01", 200])
+        ws.append(["Overall Performance", "11/1/2025 - 11/30/2025"])
+        ws.append(["Impressions", 200])
         out = tmp_path / "no_followers.xlsx"
         wb.save(out)
 
@@ -145,15 +144,14 @@ class TestParseLinkedinExport:
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = "ENGAGEMENT"
-        ws.append(["Post Date", "Post Title", "Impressions", "Reactions", "Comments", "Shares", "Clicks"])
-        ws.append(["NOT_A_DATE", "Bad row", "abc", "xyz", "", "", ""])
-        ws.append(["2025-11-01", "Good row", 1000, 50, 10, 5, 20])
+        ws.append(["Date", "Impressions", "Engagements"])
+        ws.append(["NOT_A_DATE", "abc", "xyz"])
+        ws.append(["11/1/2025", 1000, 50])
         out = tmp_path / "malformed.xlsx"
         wb.save(out)
 
         result = parse_linkedin_export(out)
-        assert len(result.posts) == 1
-        assert result.posts[0]["title"] == "Good row"
+        assert len(result.daily_metrics) == 1
 
     def test_empty_file_raises(self, tmp_path):
         f = tmp_path / "empty.xlsx"
@@ -168,25 +166,39 @@ class TestParseLinkedinExport:
             parse_linkedin_export(f)
 
     def test_csv_file_parsed(self, tmp_path):
-        """A CSV file should be accepted and treated as a single sheet."""
-        f = tmp_path / "DISCOVERY.csv"
+        """A CSV file should be accepted but won't match LinkedIn sheet names."""
+        f = tmp_path / "data.csv"
         f.write_text("Date,Impressions,Members Reached\n2025-11-01,200,140\n2025-11-02,250,175\n")
         result = parse_linkedin_export(f)
-        # CSV doesn't produce posts but should not crash
         assert isinstance(result, ParsedExport)
 
-    def test_title_truncated_to_100_chars(self, tmp_path):
-        long_title = "A" * 200
+    def test_activity_id_extracted_from_url(self, tmp_path):
+        """TOP POSTS sheet should extract activity IDs from LinkedIn URLs."""
         wb = openpyxl.Workbook()
         ws = wb.active
-        ws.title = "ENGAGEMENT"
-        ws.append(["Post Date", "Post Title", "Impressions", "Reactions", "Comments", "Shares", "Clicks"])
-        ws.append(["2025-11-01", long_title, 1000, 50, 10, 5, 20])
-        out = tmp_path / "longtitle.xlsx"
+        ws.title = "TOP POSTS"
+        ws.append(["Maximum of 50 posts available to include in this list"])
+        ws.append([None])
+        ws.cell(row=3, column=1, value="Post URL")
+        ws.cell(row=3, column=2, value="Post publish date")
+        ws.cell(row=3, column=3, value="Engagements")
+        ws.cell(row=3, column=5, value="Post URL")
+        ws.cell(row=3, column=6, value="Post publish date")
+        ws.cell(row=3, column=7, value="Impressions")
+        ws.cell(row=4, column=1, value="https://www.linkedin.com/feed/update/urn:li:activity:1234567890")
+        ws.cell(row=4, column=2, value="11/1/2025")
+        ws.cell(row=4, column=3, value=42)
+        ws.cell(row=4, column=5, value="https://www.linkedin.com/feed/update/urn:li:activity:1234567890")
+        ws.cell(row=4, column=6, value="11/1/2025")
+        ws.cell(row=4, column=7, value=1500)
+        out = tmp_path / "topposts.xlsx"
         wb.save(out)
 
         result = parse_linkedin_export(out)
-        assert len(result.posts[0]["title"]) <= 100
+        assert len(result.posts) == 1
+        assert result.posts[0]["linkedin_post_id"] == "1234567890"
+        assert result.posts[0]["impressions"] == 1500
+        assert result.posts[0]["reactions"] == 42
 
 
 # ---------------------------------------------------------------------------
@@ -309,9 +321,9 @@ class TestLoadToDb:
     def test_load_full_export(self, test_session, sample_xlsx_path):
         result = parse_linkedin_export(sample_xlsx_path)
         stats = load_to_db(test_session, result)
-        assert stats.posts_upserted >= 5
-        assert stats.follower_snapshots_upserted >= 30
-        assert stats.demographic_snapshots_upserted >= 9
+        assert stats.posts_upserted == 5
+        assert stats.follower_snapshots_upserted == 30
+        assert stats.demographic_snapshots_upserted == 20
 
     def test_load_follower_snapshots(self, test_session):
         parsed = ParsedExport(

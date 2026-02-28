@@ -207,8 +207,12 @@ def sample_demographics(test_session) -> list[DemographicSnapshot]:
 def _build_sample_xlsx(output_path: Path) -> None:
     """Create a synthetic LinkedIn analytics .xlsx export file for testing.
 
-    The file mirrors the provisional LinkedIn export format with 5 sheets:
-    DISCOVERY, ENGAGEMENT, TOP POSTS, FOLLOWERS, DEMOGRAPHICS.
+    Mirrors the real LinkedIn Premium export format (verified Feb 2026):
+    - DISCOVERY: summary metrics (label/value pairs)
+    - ENGAGEMENT: daily totals (Date | Impressions | Engagements)
+    - TOP POSTS: two side-by-side tables (Engagements A-C, Impressions E-G)
+    - FOLLOWERS: total at top, then Date | New followers (header at row 3)
+    - DEMOGRAPHICS: Category | Value | Percentage (header: "Top Demographics")
     """
     wb = openpyxl.Workbook()
 
@@ -219,92 +223,108 @@ def _build_sample_xlsx(output_path: Path) -> None:
     base_date = date(2025, 11, 1)
 
     # ------------------------------------------------------------------
-    # Sheet 1: DISCOVERY — daily account-level impressions
+    # Sheet 1: DISCOVERY — summary (not daily)
     # ------------------------------------------------------------------
     ws_discovery = wb.create_sheet("DISCOVERY")
-    ws_discovery.append(["Date", "Impressions", "Members Reached"])
+    ws_discovery.append(["Overall Performance", "11/1/2025 - 11/30/2025"])
+    ws_discovery.append(["Impressions", 15800])
+    ws_discovery.append(["Members reached", 9200])
+
+    # ------------------------------------------------------------------
+    # Sheet 2: ENGAGEMENT — daily totals
+    # ------------------------------------------------------------------
+    ws_engagement = wb.create_sheet("ENGAGEMENT")
+    ws_engagement.append(["Date", "Impressions", "Engagements"])
     for i in range(30):
         d = base_date + timedelta(days=i)
         impressions = 200 + (i % 7) * 50
-        reached = int(impressions * 0.7)
-        ws_discovery.append([d.strftime("%Y-%m-%d"), impressions, reached])
+        engagements = int(impressions * 0.03)
+        ws_engagement.append([d.strftime("%m/%d/%Y"), impressions, engagements])
 
     # ------------------------------------------------------------------
-    # Sheet 2: ENGAGEMENT — per-post engagement metrics
-    # ------------------------------------------------------------------
-    ws_engagement = wb.create_sheet("ENGAGEMENT")
-    ws_engagement.append([
-        "Post Date", "Post Title", "Post Type",
-        "Impressions", "Members Reached",
-        "Reactions", "Comments", "Shares", "Clicks",
-    ])
-    posts = [
-        (base_date, "The commitment-without-execution loop in enterprise security", "text", 3200, 2400, 180, 32, 15, 65),
-        (base_date + timedelta(days=7), "Quantify or kill: how to make risk legible to executives", "text", 2800, 2100, 155, 28, 12, 55),
-        (base_date + timedelta(days=14), "I built an AI red team that argues with itself", "article", 4500, 3200, 210, 45, 22, 90),
-        (base_date + timedelta(days=21), "From HackTheBox to the boardroom", "text", 5100, 3800, 280, 62, 35, 110),
-        (base_date + timedelta(days=28), "Why vulnerability management is a data problem", "text", 2200, 1600, 120, 20, 8, 40),
-    ]
-    for post_date, title, ptype, impressions, reached, reactions, comments, shares, clicks in posts:
-        ws_engagement.append([
-            post_date.strftime("%Y-%m-%d"), title, ptype,
-            impressions, reached, reactions, comments, shares, clicks,
-        ])
-
-    # ------------------------------------------------------------------
-    # Sheet 3: TOP POSTS — best performing posts (subset of ENGAGEMENT)
+    # Sheet 3: TOP POSTS — two side-by-side tables
     # ------------------------------------------------------------------
     ws_top = wb.create_sheet("TOP POSTS")
-    ws_top.append([
-        "Post Date", "Post Title", "Post Type",
-        "Impressions", "Members Reached",
-        "Reactions", "Comments", "Shares", "Clicks",
-    ])
-    # Include top 3 posts
-    for post_date, title, ptype, impressions, reached, reactions, comments, shares, clicks in posts[:3]:
-        ws_top.append([
-            post_date.strftime("%Y-%m-%d"), title, ptype,
-            impressions, reached, reactions, comments, shares, clicks,
-        ])
+    ws_top.append(["Maximum of 50 posts available to include in this list"])
+    ws_top.append([None])  # empty row 2
+
+    # Header row (row 3): A-C for engagements, E-G for impressions
+    ws_top.cell(row=3, column=1, value="Post URL")
+    ws_top.cell(row=3, column=2, value="Post publish date")
+    ws_top.cell(row=3, column=3, value="Engagements")
+    ws_top.cell(row=3, column=5, value="Post URL")
+    ws_top.cell(row=3, column=6, value="Post publish date")
+    ws_top.cell(row=3, column=7, value="Impressions")
+
+    # Data rows
+    posts_data = [
+        ("7400000000000000001", base_date, 180, 3200),
+        ("7400000000000000002", base_date + timedelta(days=7), 155, 2800),
+        ("7400000000000000003", base_date + timedelta(days=14), 210, 4500),
+        ("7400000000000000004", base_date + timedelta(days=21), 280, 5100),
+        ("7400000000000000005", base_date + timedelta(days=28), 120, 2200),
+    ]
+
+    # Sort by engagements for left table, by impressions for right table
+    by_engagements = sorted(posts_data, key=lambda x: x[2], reverse=True)
+    by_impressions = sorted(posts_data, key=lambda x: x[3], reverse=True)
+
+    for row_idx in range(len(posts_data)):
+        row_num = row_idx + 4  # start at row 4
+
+        # Left table (engagements)
+        if row_idx < len(by_engagements):
+            aid, pdate, eng, _ = by_engagements[row_idx]
+            ws_top.cell(row=row_num, column=1, value=f"https://www.linkedin.com/feed/update/urn:li:activity:{aid}")
+            ws_top.cell(row=row_num, column=2, value=pdate.strftime("%m/%d/%Y"))
+            ws_top.cell(row=row_num, column=3, value=eng)
+
+        # Right table (impressions)
+        if row_idx < len(by_impressions):
+            aid, pdate, _, imp = by_impressions[row_idx]
+            ws_top.cell(row=row_num, column=5, value=f"https://www.linkedin.com/feed/update/urn:li:activity:{aid}")
+            ws_top.cell(row=row_num, column=6, value=pdate.strftime("%m/%d/%Y"))
+            ws_top.cell(row=row_num, column=7, value=imp)
 
     # ------------------------------------------------------------------
-    # Sheet 4: FOLLOWERS — daily follower counts
+    # Sheet 4: FOLLOWERS — total at top, header at row 3
     # ------------------------------------------------------------------
     ws_followers = wb.create_sheet("FOLLOWERS")
-    ws_followers.append(["Date", "Total Followers", "New Followers"])
-    followers = 450
+    ws_followers.append(["Total followers on 11/30/2025:", 520])
+    ws_followers.append([None])  # empty row 2
+    ws_followers.append(["Date", "New followers"])
+    followers_total = 450
     for i in range(30):
         d = base_date + timedelta(days=i)
         new = i % 5 + 1
-        followers += new
-        ws_followers.append([d.strftime("%Y-%m-%d"), followers, new])
+        ws_followers.append([d.strftime("%m/%d/%Y"), new])
 
     # ------------------------------------------------------------------
-    # Sheet 5: DEMOGRAPHICS — audience breakdown
+    # Sheet 5: DEMOGRAPHICS — "Top Demographics" header
     # ------------------------------------------------------------------
     ws_demo = wb.create_sheet("DEMOGRAPHICS")
-    ws_demo.append(["Category", "Value", "Percentage"])
+    ws_demo.append(["Top Demographics", "Value", "Percentage"])
     demo_rows = [
-        ("industry", "Information Technology", 32.5),
-        ("industry", "Financial Services", 18.2),
-        ("industry", "Cybersecurity", 14.0),
-        ("industry", "Healthcare", 8.5),
-        ("industry", "Other", 26.8),
-        ("job_title", "Director", 22.0),
-        ("job_title", "Manager", 18.5),
-        ("job_title", "Individual Contributor", 30.0),
-        ("job_title", "Executive", 12.0),
-        ("job_title", "Other", 17.5),
-        ("seniority", "Senior", 40.0),
-        ("seniority", "Director", 25.0),
-        ("seniority", "Entry", 15.0),
-        ("seniority", "VP", 12.0),
-        ("seniority", "C-Suite", 8.0),
-        ("location", "United States", 55.0),
-        ("location", "Canada", 12.0),
-        ("location", "United Kingdom", 9.5),
-        ("location", "India", 8.0),
-        ("location", "Other", 15.5),
+        ("Industries", "Information Technology", 0.325),
+        ("Industries", "Financial Services", 0.182),
+        ("Industries", "Cybersecurity", 0.140),
+        ("Industries", "Healthcare", 0.085),
+        ("Industries", "Other", 0.268),
+        ("Job titles", "Director", 0.220),
+        ("Job titles", "Manager", 0.185),
+        ("Job titles", "Individual Contributor", 0.300),
+        ("Job titles", "Executive", 0.120),
+        ("Job titles", "Other", 0.175),
+        ("Seniority", "Senior", 0.400),
+        ("Seniority", "Director", 0.250),
+        ("Seniority", "Entry", 0.150),
+        ("Seniority", "VP", 0.120),
+        ("Seniority", "C-Suite", 0.080),
+        ("Locations", "United States", 0.550),
+        ("Locations", "Canada", 0.120),
+        ("Locations", "United Kingdom", 0.095),
+        ("Locations", "India", 0.080),
+        ("Locations", "Other", 0.155),
     ]
     for category, value, pct in demo_rows:
         ws_demo.append([category, value, pct])
