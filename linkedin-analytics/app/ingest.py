@@ -569,6 +569,8 @@ def _upsert_post(session: Session, record: dict[str, Any]) -> Post:
         existing.clicks = max(existing.clicks or 0, record.get("clicks", 0))
         if record.get("linkedin_post_id") and not existing.linkedin_post_id:
             existing.linkedin_post_id = record["linkedin_post_id"]
+        if record.get("post_url") and not existing.post_url:
+            existing.post_url = record["post_url"]
         if record.get("post_type") and not existing.post_type:
             existing.post_type = record["post_type"]
         existing.recalculate_engagement_rate()
@@ -576,6 +578,7 @@ def _upsert_post(session: Session, record: dict[str, Any]) -> Post:
 
     post = Post(
         linkedin_post_id=record.get("linkedin_post_id"),
+        post_url=record.get("post_url"),
         title=record.get("title"),
         post_date=record["post_date"],
         post_type=record.get("post_type"),

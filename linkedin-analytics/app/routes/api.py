@@ -305,7 +305,7 @@ async def get_demographics(
         "category": category,
         "snapshot_date": str(latest_date),
         "labels": [r.value for r in rows],
-        "values": [round(r.percentage, 2) for r in rows],
+        "values": [round(r.percentage * 100, 1) for r in rows],
     }
 
 

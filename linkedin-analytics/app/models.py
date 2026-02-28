@@ -25,6 +25,7 @@ class Post(Base):
 
     id: int = Column(Integer, primary_key=True, autoincrement=True)
     linkedin_post_id: str | None = Column(String, unique=True, nullable=True)
+    post_url: str | None = Column(String, nullable=True)
     title: str | None = Column(String(100), nullable=True)
     post_date: date = Column(Date, nullable=False)
     post_type: str | None = Column(String, nullable=True)
@@ -41,6 +42,15 @@ class Post(Base):
     daily_metrics = relationship(
         "DailyMetric", back_populates="post", cascade="all, delete-orphan"
     )
+
+    @property
+    def display_title(self) -> str:
+        """Human-readable title for display. Falls back to date + ID."""
+        if self.title:
+            return self.title
+        if self.linkedin_post_id:
+            return f"Post {self.post_date} (#{self.linkedin_post_id[-6:]})"
+        return f"Post {self.post_date}"
 
     def recalculate_engagement_rate(self) -> None:
         """Recalculate engagement_rate from raw metrics."""

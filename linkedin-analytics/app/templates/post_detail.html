@@ -39,10 +39,16 @@
   <div class="flex items-start justify-between gap-4">
     <div class="flex-1 min-w-0">
       <h2 class="text-lg font-semibold text-text leading-snug">
-        {{ post.title or "(no title captured)" }}
+        {{ post.display_title }}
       </h2>
       <div class="flex items-center gap-3 mt-2 text-sm text-text-muted">
         <span class="font-mono">{{ post.post_date }}</span>
+        {% if post.post_url %}
+          <a href="{{ post.post_url }}" target="_blank" rel="noopener"
+             class="text-accent/70 hover:text-accent transition-colors text-xs">
+            view on LinkedIn &nearr;
+          </a>
+        {% endif %}
         {% if post.post_type %}
           <span class="bg-white/5 px-2 py-0.5 rounded text-xs">{{ post.post_type }}</span>
         {% endif %}

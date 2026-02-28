@@ -23,10 +23,16 @@
         <td class="py-3 pr-4 max-w-xs">
           {% if show_links | default(true) %}
             <a href="/dashboard/posts/{{ post.id }}" class="text-text hover:text-accent transition-colors line-clamp-2">
-              {{ post.title or "(no title)" }}
+              {{ post.display_title }}
             </a>
           {% else %}
-            <span class="text-text line-clamp-2">{{ post.title or "(no title)" }}</span>
+            <span class="text-text line-clamp-2">{{ post.display_title }}</span>
+          {% endif %}
+          {% if post.post_url %}
+            <a href="{{ post.post_url }}" target="_blank" rel="noopener"
+               class="inline-block mt-0.5 text-xs text-accent/60 hover:text-accent transition-colors">
+              view on LinkedIn &nearr;
+            </a>
           {% endif %}
           {% if post.post_type %}
             <span class="inline-block mt-0.5 text-xs text-text-dim bg-white/5 px-1.5 py-0.5 rounded">

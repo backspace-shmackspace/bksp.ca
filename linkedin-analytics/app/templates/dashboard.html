@@ -125,7 +125,7 @@
   const dashboardConfig = {
     days: {{ days }},
     posts: {{ recent_posts | map(attribute='id') | list | tojson }},
-    postLabels: {{ recent_posts | map(attribute='title') | list | tojson }},
+    postLabels: {{ recent_posts | map(attribute='display_title') | list | tojson }},
     postEngagement: {{ recent_posts | map(attribute='engagement_rate') | list | tojson }},
   };
   initDashboard(dashboardConfig);

@@ -173,6 +173,9 @@ async def audience(
                 .limit(10)
                 .all()
             )
+            # Convert decimal percentages (0.40) to display percentages (40.0)
+            for row in rows:
+                row.percentage = round(row.percentage * 100, 1)
             demographics[category] = rows
 
     return templates.TemplateResponse(
