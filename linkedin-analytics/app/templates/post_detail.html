@@ -70,19 +70,25 @@
 </div>
 
 <!-- Metric breakdown cards -->
-<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+<div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
   {% for label, value, color in [
     ("Impressions",      post.impressions,      "text-text"),
-    ("Members Reached",  post.members_reached,  "text-text"),
-    ("Reactions",        post.reactions,        "text-success"),
-    ("Comments",         post.comments,         "text-accent"),
-    ("Shares",           post.shares,           "text-warning"),
-    ("Clicks",           post.clicks,           "text-text-muted"),
+    ("Engagements",      post.reactions,        "text-success"),
+    ("Eng. Rate",        None,                  None),
   ] %}
   <div class="bg-card rounded-xl border border-white/5 p-4 text-center">
+    {% if label == "Eng. Rate" %}
+    <div class="text-xl font-mono font-semibold
+                {% if post.engagement_rate >= 0.05 %}text-success
+                {% elif post.engagement_rate >= 0.02 %}text-warning
+                {% else %}text-text-muted{% endif %}">
+      {{ "%.1f%%"|format(post.engagement_rate * 100) }}
+    </div>
+    {% else %}
     <div class="text-xl font-mono font-semibold {{ color }}">
       {{ "{:,}".format(value) }}
     </div>
+    {% endif %}
     <div class="text-xs text-text-dim mt-1">{{ label }}</div>
   </div>
   {% endfor %}
@@ -98,14 +104,6 @@
 </div>
 {% endif %}
 
-<!-- Engagement breakdown chart -->
-<div class="bg-card rounded-xl border border-white/5 p-5">
-  <h3 class="text-sm font-medium text-text mb-4">Engagement Breakdown</h3>
-  <div class="h-48">
-    <canvas id="postEngagementChart"></canvas>
-  </div>
-</div>
-
 {% endblock %}
 
 
@@ -114,10 +112,7 @@
 <script>
   const postConfig = {
     impressions: {{ post.impressions }},
-    reactions:   {{ post.reactions }},
-    comments:    {{ post.comments }},
-    shares:      {{ post.shares }},
-    clicks:      {{ post.clicks }},
+    engagements: {{ post.reactions }},
     {% if daily_metrics %}
     dailyLabels: {{ daily_metrics | map(attribute='metric_date') | map('string') | list | tojson }},
     dailyValues: {{ daily_metrics | map(attribute='impressions') | list | tojson }},

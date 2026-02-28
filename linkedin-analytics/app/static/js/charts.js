@@ -218,27 +218,7 @@ async function initDashboard(config) {
 // ---------------------------------------------------------------------------
 
 function initPostDetail(config) {
-  const { impressions, reactions, comments, shares, clicks, dailyLabels, dailyValues } = config;
-
-  // Engagement breakdown doughnut
-  const engCtx = document.getElementById("postEngagementChart");
-  if (engCtx) {
-    new Chart(engCtx, {
-      type: "doughnut",
-      data: {
-        labels: ["Reactions", "Comments", "Shares", "Clicks"],
-        datasets: [
-          {
-            data: [reactions, comments, shares, clicks],
-            backgroundColor: [COLORS.success, COLORS.accent, COLORS.warning, COLORS.muted],
-            borderWidth: 0,
-            hoverOffset: 6,
-          },
-        ],
-      },
-      options: commonDoughnutOptions(),
-    });
-  }
+  const { dailyLabels, dailyValues } = config;
 
   // Daily trend line (if available)
   if (dailyLabels && dailyLabels.length > 0) {
