@@ -10,7 +10,8 @@
         <th class="text-left text-text-dim font-medium pb-3 pr-4">Date</th>
         <th class="text-left text-text-dim font-medium pb-3 pr-4">Post</th>
         <th class="text-right text-text-dim font-medium pb-3 pr-4">Impressions</th>
-        <th class="text-right text-text-dim font-medium pb-3 pr-4">Engagements</th>
+        <th class="text-right text-text-dim font-medium pb-3 pr-4">Reactions</th>
+        <th class="text-right text-text-dim font-medium pb-3 pr-4">Comments</th>
         <th class="text-right text-text-dim font-medium pb-3">Eng. Rate</th>
       </tr>
     </thead>
@@ -40,6 +41,7 @@
         </td>
         <td class="py-3 pr-4 text-right font-mono text-text">{{ "{:,}".format(post.impressions) }}</td>
         <td class="py-3 pr-4 text-right font-mono text-text">{{ "{:,}".format(post.reactions) }}</td>
+        <td class="py-3 pr-4 text-right font-mono text-text">{{ "{:,}".format(post.comments) }}</td>
         <td class="py-3 text-right font-mono
                    {% if post.engagement_rate >= 0.05 %}text-success
                    {% elif post.engagement_rate >= 0.02 %}text-warning
@@ -49,7 +51,7 @@
       </tr>
       {% else %}
       <tr>
-        <td colspan="5" class="py-8 text-center text-text-dim text-sm">
+        <td colspan="6" class="py-8 text-center text-text-dim text-sm">
           No posts found. Upload a LinkedIn export to get started.
         </td>
       </tr>

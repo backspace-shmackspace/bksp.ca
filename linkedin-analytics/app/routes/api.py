@@ -354,11 +354,18 @@ async def update_post(
     post_id: int,
     draft_id: str = Query(None, max_length=20),
     title: str = Query(None, max_length=100),
+    impressions: int = Query(None, ge=0),
+    reactions: int = Query(None, ge=0),
+    comments: int = Query(None, ge=0),
+    shares: int = Query(None, ge=0),
+    clicks: int = Query(None, ge=0),
     db: Session = Depends(get_session),
 ):
-    """Update a post's draft_id or title.
+    """Update a post's metadata or metrics.
 
-    Used to link dashboard posts to draft files in the bksp.ca repo.
+    Used to link dashboard posts to draft files and to correct metrics
+    with actual lifetime values from LinkedIn's in-app analytics (the
+    export only captures metrics within its date range window).
     """
     post = db.query(Post).filter_by(id=post_id).first()
     if not post:
@@ -368,7 +375,18 @@ async def update_post(
         post.draft_id = draft_id if draft_id else None
     if title is not None:
         post.title = title if title else None
+    if impressions is not None:
+        post.impressions = impressions
+    if reactions is not None:
+        post.reactions = reactions
+    if comments is not None:
+        post.comments = comments
+    if shares is not None:
+        post.shares = shares
+    if clicks is not None:
+        post.clicks = clicks
 
+    post.recalculate_engagement_rate()
     db.commit()
     db.refresh(post)
 
@@ -377,6 +395,12 @@ async def update_post(
         "draft_id": post.draft_id,
         "title": post.title,
         "display_title": post.display_title,
+        "impressions": post.impressions,
+        "reactions": post.reactions,
+        "comments": post.comments,
+        "shares": post.shares,
+        "clicks": post.clicks,
+        "engagement_rate": post.engagement_rate,
     }
 
 
