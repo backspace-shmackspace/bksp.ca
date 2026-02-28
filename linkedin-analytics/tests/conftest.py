@@ -348,3 +348,50 @@ def sample_xlsx_path() -> Path:
 def sample_xlsx_bytes(sample_xlsx_path) -> bytes:
     """Return the raw bytes of the sample .xlsx file."""
     return sample_xlsx_path.read_bytes()
+
+
+@pytest.fixture
+def sample_posts_with_cohorts(test_session) -> list[Post]:
+    """Insert 6 sample posts with cohort metadata into the test database.
+
+    Creates two posts per topic so that cohort grouping has meaningful data.
+    Posts are spread across two calendar months for monthly median testing.
+    """
+    posts = []
+    base_date = date(2025, 10, 1)
+    cohort_data = [
+        # (topic, content_format, hook_style, length_bucket, post_hour,
+        #  impressions, reactions, comments, shares)
+        ("risk-management", "story",    "personal-story", "medium", 8,  2000, 80, 20, 10),
+        ("risk-management", "listicle", "statistic",      "short",  9,  1800, 60, 12,  5),
+        ("devsecops",       "tutorial", "how-to",         "long",   10, 3000, 90, 30, 15),
+        ("devsecops",       "hot-take", "contrarian",     "short",  11, 1500, 50,  8,  3),
+        ("htb-writeup",     "tutorial", "how-to",         "long",   14, 2500, 70, 18, 12),
+        ("htb-writeup",     "story",    "personal-story", "medium", 15, 2200, 65, 14,  8),
+    ]
+    for i, (topic, fmt, hook, length, hour, impr, reac, comm, shar) in enumerate(
+        cohort_data
+    ):
+        post = Post(
+            post_date=base_date + timedelta(days=i * 14),
+            title=f"Cohort test post {i + 1}",
+            post_type="text",
+            impressions=impr,
+            members_reached=int(impr * 0.8),
+            reactions=reac,
+            comments=comm,
+            shares=shar,
+            clicks=reac // 2,
+            topic=topic,
+            content_format=fmt,
+            hook_style=hook,
+            length_bucket=length,
+            post_hour=hour,
+        )
+        post.recalculate_engagement_rate()
+        test_session.add(post)
+        posts.append(post)
+    test_session.commit()
+    for p in posts:
+        test_session.refresh(p)
+    return posts

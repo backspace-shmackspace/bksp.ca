@@ -128,6 +128,104 @@
   </div>
 </div>
 
+<!-- Content Tags (cohort metadata) -->
+<div class="bg-card rounded-xl border border-white/5 p-5 mb-6">
+  <div class="flex items-center justify-between mb-4">
+    <h3 class="text-sm font-medium text-text">Content Tags</h3>
+    <div class="flex items-center gap-2">
+      <span id="tagSaveStatus" class="text-xs text-success hidden">Saved</span>
+      <button onclick="saveTags()" id="saveTagsBtn"
+              class="text-xs bg-accent/20 hover:bg-accent/30 text-accent px-2 py-1 rounded transition-colors">
+        Save Tags
+      </button>
+    </div>
+  </div>
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+    <!-- Topic -->
+    <div>
+      <label class="block text-xs text-text-dim mb-1">Topic</label>
+      <input list="topicOptions" id="tagTopic" name="topic"
+             value="{{ post.topic or '' }}"
+             placeholder="e.g. risk-management"
+             class="w-full bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-text
+                    focus:outline-none focus:border-accent/50">
+      <datalist id="topicOptions">
+        <option value="risk-management">
+        <option value="devsecops">
+        <option value="psirt">
+        <option value="htb-writeup">
+        <option value="ai-agents">
+        <option value="career">
+        <option value="leadership">
+        <option value="security-culture">
+        <option value="vulnerability-management">
+        <option value="compliance">
+      </datalist>
+    </div>
+
+    <!-- Format -->
+    <div>
+      <label class="block text-xs text-text-dim mb-1">Format</label>
+      <select id="tagFormat" name="content_format"
+              class="w-full bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-text
+                     focus:outline-none focus:border-accent/50 cursor-pointer">
+        <option value="">-- none --</option>
+        <option value="story"         {% if post.content_format == 'story' %}selected{% endif %}>Story</option>
+        <option value="listicle"      {% if post.content_format == 'listicle' %}selected{% endif %}>Listicle</option>
+        <option value="hot-take"      {% if post.content_format == 'hot-take' %}selected{% endif %}>Hot Take</option>
+        <option value="tutorial"      {% if post.content_format == 'tutorial' %}selected{% endif %}>Tutorial</option>
+        <option value="case-study"    {% if post.content_format == 'case-study' %}selected{% endif %}>Case Study</option>
+        <option value="data-analysis" {% if post.content_format == 'data-analysis' %}selected{% endif %}>Data Analysis</option>
+        <option value="question"      {% if post.content_format == 'question' %}selected{% endif %}>Question</option>
+        <option value="announcement"  {% if post.content_format == 'announcement' %}selected{% endif %}>Announcement</option>
+      </select>
+    </div>
+
+    <!-- Hook Style -->
+    <div>
+      <label class="block text-xs text-text-dim mb-1">Hook Style</label>
+      <select id="tagHookStyle" name="hook_style"
+              class="w-full bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-text
+                     focus:outline-none focus:border-accent/50 cursor-pointer">
+        <option value="">-- none --</option>
+        <option value="question"       {% if post.hook_style == 'question' %}selected{% endif %}>Question</option>
+        <option value="statistic"      {% if post.hook_style == 'statistic' %}selected{% endif %}>Statistic</option>
+        <option value="contrarian"     {% if post.hook_style == 'contrarian' %}selected{% endif %}>Contrarian</option>
+        <option value="personal-story" {% if post.hook_style == 'personal-story' %}selected{% endif %}>Personal Story</option>
+        <option value="news-hook"      {% if post.hook_style == 'news-hook' %}selected{% endif %}>News Hook</option>
+        <option value="bold-claim"     {% if post.hook_style == 'bold-claim' %}selected{% endif %}>Bold Claim</option>
+        <option value="how-to"         {% if post.hook_style == 'how-to' %}selected{% endif %}>How-To</option>
+        <option value="mistake-learned"{% if post.hook_style == 'mistake-learned' %}selected{% endif %}>Mistake Learned</option>
+      </select>
+    </div>
+
+    <!-- Length -->
+    <div>
+      <label class="block text-xs text-text-dim mb-1">Length</label>
+      <select id="tagLength" name="length_bucket"
+              class="w-full bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-text
+                     focus:outline-none focus:border-accent/50 cursor-pointer">
+        <option value="">-- none --</option>
+        <option value="short"  {% if post.length_bucket == 'short' %}selected{% endif %}>Short (&lt;500 chars)</option>
+        <option value="medium" {% if post.length_bucket == 'medium' %}selected{% endif %}>Medium (500-1500)</option>
+        <option value="long"   {% if post.length_bucket == 'long' %}selected{% endif %}>Long (&gt;1500)</option>
+      </select>
+    </div>
+
+    <!-- Post Hour -->
+    <div>
+      <label class="block text-xs text-text-dim mb-1">Post Hour (0-23)</label>
+      <input type="number" id="tagPostHour" name="post_hour" min="0" max="23"
+             value="{{ post.post_hour if post.post_hour is not none else '' }}"
+             placeholder="e.g. 9"
+             class="w-full bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-text font-mono
+                    focus:outline-none focus:border-accent/50">
+    </div>
+
+  </div>
+</div>
+
 <!-- Daily trend chart (if daily data is available) -->
 {% if daily_metrics %}
 <div class="bg-card rounded-xl border border-white/5 p-5 mb-6">
@@ -197,6 +295,48 @@
     editBtn.classList.toggle("hidden");
     saveBtn.classList.toggle("hidden");
     if (!isEditing) inputs[0].focus();
+  }
+
+  async function saveTags() {
+    const status = document.getElementById("tagSaveStatus");
+    const btn = document.getElementById("saveTagsBtn");
+    btn.disabled = true;
+    btn.textContent = "...";
+
+    const params = new URLSearchParams();
+    const topic = document.getElementById("tagTopic").value;
+    const format = document.getElementById("tagFormat").value;
+    const hookStyle = document.getElementById("tagHookStyle").value;
+    const length = document.getElementById("tagLength").value;
+    const postHour = document.getElementById("tagPostHour").value;
+
+    params.set("topic", topic);
+    params.set("content_format", format);
+    params.set("hook_style", hookStyle);
+    params.set("length_bucket", length);
+    if (postHour !== "") {
+      params.set("post_hour", postHour);
+    }
+
+    try {
+      const resp = await fetch(`/api/posts/{{ post.id }}?${params}`, { method: "PATCH" });
+      if (resp.ok) {
+        status.classList.remove("hidden");
+        status.textContent = "Saved";
+        status.className = "text-xs text-success";
+        setTimeout(() => status.classList.add("hidden"), 2000);
+      } else {
+        status.classList.remove("hidden");
+        status.textContent = "Error";
+        status.className = "text-xs text-warning";
+      }
+    } catch (e) {
+      status.classList.remove("hidden");
+      status.textContent = "Failed";
+      status.className = "text-xs text-danger";
+    }
+    btn.disabled = false;
+    btn.textContent = "Save Tags";
   }
 
   async function saveMetrics() {

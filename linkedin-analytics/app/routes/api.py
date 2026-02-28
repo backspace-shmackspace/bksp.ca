@@ -1,9 +1,11 @@
 """JSON API routes for chart data and dashboard metrics."""
 
 import logging
+import math
 import sqlite3
-import tempfile
+import statistics
 import uuid
+from collections import defaultdict
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
@@ -260,6 +262,12 @@ def _serialize_post(post: Post) -> dict[str, Any]:
         "shares": post.shares,
         "clicks": post.clicks,
         "engagement_rate": round(post.engagement_rate or 0.0, 4),
+        "weighted_score": round(post.weighted_score, 6),
+        "topic": post.topic,
+        "content_format": post.content_format,
+        "hook_style": post.hook_style,
+        "length_bucket": post.length_bucket,
+        "post_hour": post.post_hour,
     }
 
 
@@ -359,6 +367,11 @@ async def update_post(
     comments: int = Query(None, ge=0),
     shares: int = Query(None, ge=0),
     clicks: int = Query(None, ge=0),
+    topic: str = Query(None, max_length=50),
+    content_format: str = Query(None, max_length=30),
+    hook_style: str = Query(None, max_length=30),
+    length_bucket: str = Query(None, max_length=20),
+    post_hour: int = Query(None, ge=0, le=23),
     db: Session = Depends(get_session),
 ):
     """Update a post's metadata or metrics.
@@ -366,6 +379,10 @@ async def update_post(
     Used to link dashboard posts to draft files and to correct metrics
     with actual lifetime values from LinkedIn's in-app analytics (the
     export only captures metrics within its date range window).
+
+    String cohort fields (topic, content_format, hook_style, length_bucket)
+    are normalized on input: lowercased, stripped, spaces replaced with hyphens.
+    Empty strings are stored as null to prevent cohort fragmentation.
     """
     post = db.query(Post).filter_by(id=post_id).first()
     if not post:
@@ -385,6 +402,16 @@ async def update_post(
         post.shares = shares
     if clicks is not None:
         post.clicks = clicks
+    if topic is not None:
+        post.topic = _normalize_cohort_value(topic)
+    if content_format is not None:
+        post.content_format = _normalize_cohort_value(content_format)
+    if hook_style is not None:
+        post.hook_style = _normalize_cohort_value(hook_style)
+    if length_bucket is not None:
+        post.length_bucket = _normalize_cohort_value(length_bucket)
+    if post_hour is not None:
+        post.post_hour = post_hour
 
     post.recalculate_engagement_rate()
     db.commit()
@@ -401,7 +428,240 @@ async def update_post(
         "shares": post.shares,
         "clicks": post.clicks,
         "engagement_rate": post.engagement_rate,
+        "weighted_score": post.weighted_score,
+        "topic": post.topic,
+        "content_format": post.content_format,
+        "hook_style": post.hook_style,
+        "length_bucket": post.length_bucket,
+        "post_hour": post.post_hour,
     }
+
+
+# ---------------------------------------------------------------------------
+# Cohort / analytics helpers
+# ---------------------------------------------------------------------------
+
+
+def _normalize_cohort_value(value: str) -> str | None:
+    """Normalize a cohort string field for storage.
+
+    Lowercases, strips leading/trailing whitespace, and replaces internal
+    spaces with hyphens. Returns None for empty strings so that blank
+    submissions clear the field rather than storing an empty string.
+    """
+    normalized = value.strip().lower().replace(" ", "-")
+    return normalized if normalized else None
+
+
+def _compute_rolling_avg(posts: list[Post], window: int = 5) -> list[float]:
+    """Compute rolling average of engagement_rate over a sorted list of posts.
+
+    For the first N posts where N < window, averages over all available posts
+    up to that point.
+    """
+    result = []
+    for i, post in enumerate(posts):
+        start = max(0, i - window + 1)
+        window_posts = posts[start : i + 1]
+        avg = sum((p.engagement_rate or 0.0) for p in window_posts) / len(window_posts)
+        result.append(round(avg, 6))
+    return result
+
+
+def _compute_top_10pct_threshold(engagement_rates: list[float]) -> float:
+    """Return the engagement rate at the 90th percentile (top 10% threshold)."""
+    if not engagement_rates:
+        return 0.0
+    sorted_rates = sorted(engagement_rates)
+    idx = math.ceil(len(sorted_rates) * 0.9) - 1
+    return sorted_rates[max(0, idx)]
+
+
+def _compute_monthly_medians(posts: list[Post]) -> list[dict]:
+    """Group posts by YYYY-MM and compute median engagement rate and weighted score per month."""
+    by_month: dict[str, list[Post]] = defaultdict(list)
+    for p in posts:
+        key = p.post_date.strftime("%Y-%m")
+        by_month[key].append(p)
+
+    return [
+        {
+            "month": month,
+            "median_engagement_rate": round(
+                statistics.median((p.engagement_rate or 0.0) for p in month_posts), 6
+            ),
+            "median_weighted_score": round(
+                statistics.median(p.weighted_score for p in month_posts), 6
+            ),
+            "post_count": len(month_posts),
+        }
+        for month, month_posts in sorted(by_month.items())
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Analytics endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.get("/api/analytics/engagement")
+async def analytics_engagement(
+    days: int = Query(365, ge=30, le=1825),
+    db: Session = Depends(get_session),
+) -> dict[str, Any]:
+    """Return engagement rate time series, rolling average, monthly medians,
+    top 10% threshold, and baseline vs last 30 days comparison.
+
+    Args:
+        days: Lookback window in days (default 365, min 30, max 1825).
+
+    Returns:
+        JSON with posts, monthly_medians, top_10pct_threshold, baseline,
+        last_30d, and period_days.
+    """
+    cutoff = date.today() - timedelta(days=days)
+    last_30d_cutoff = date.today() - timedelta(days=30)
+
+    all_posts = (
+        db.query(Post)
+        .filter(Post.post_date >= cutoff)
+        .order_by(Post.post_date)
+        .all()
+    )
+
+    rolling_avgs = _compute_rolling_avg(all_posts)
+    engagement_rates = [p.engagement_rate or 0.0 for p in all_posts]
+    threshold = _compute_top_10pct_threshold(engagement_rates)
+    monthly_medians = _compute_monthly_medians(all_posts)
+
+    # Baseline: all posts in lookback window
+    baseline_posts = all_posts
+    baseline_count = len(baseline_posts)
+    if baseline_count > 0:
+        baseline_avg_er = round(
+            sum(p.engagement_rate or 0.0 for p in baseline_posts) / baseline_count, 6
+        )
+        baseline_avg_ws = round(
+            sum(p.weighted_score for p in baseline_posts) / baseline_count, 6
+        )
+    else:
+        baseline_avg_er = 0.0
+        baseline_avg_ws = 0.0
+
+    # Last 30 days
+    last_30d_posts = [p for p in all_posts if p.post_date >= last_30d_cutoff]
+    last_30d_count = len(last_30d_posts)
+    if last_30d_count > 0:
+        last_30d_avg_er = round(
+            sum(p.engagement_rate or 0.0 for p in last_30d_posts) / last_30d_count, 6
+        )
+        last_30d_avg_ws = round(
+            sum(p.weighted_score for p in last_30d_posts) / last_30d_count, 6
+        )
+    else:
+        last_30d_avg_er = 0.0
+        last_30d_avg_ws = 0.0
+
+    post_data = [
+        {
+            "id": p.id,
+            "post_date": str(p.post_date),
+            "title": p.display_title,
+            "engagement_rate": round(p.engagement_rate or 0.0, 6),
+            "weighted_score": round(p.weighted_score, 6),
+            "rolling_avg_5": rolling_avgs[i],
+            "impressions": p.impressions,
+            "reactions": p.reactions,
+            "comments": p.comments,
+            "shares": p.shares,
+        }
+        for i, p in enumerate(all_posts)
+    ]
+
+    return {
+        "posts": post_data,
+        "monthly_medians": monthly_medians,
+        "top_10pct_threshold": round(threshold, 6),
+        "baseline": {
+            "avg_engagement_rate": baseline_avg_er,
+            "avg_weighted_score": baseline_avg_ws,
+            "post_count": baseline_count,
+        },
+        "last_30d": {
+            "avg_engagement_rate": last_30d_avg_er,
+            "avg_weighted_score": last_30d_avg_ws,
+            "post_count": last_30d_count,
+        },
+        "period_days": days,
+    }
+
+
+@router.get("/api/analytics/cohorts")
+async def analytics_cohorts(
+    dimension: str = Query(
+        ...,
+        pattern="^(topic|content_format|hook_style|length_bucket|post_hour)$",
+    ),
+    db: Session = Depends(get_session),
+) -> dict[str, Any]:
+    """Return engagement metrics grouped by a cohort dimension.
+
+    Only posts with the requested dimension populated are included.
+    Posts with null values for the dimension are excluded.
+
+    Args:
+        dimension: One of topic, content_format, hook_style, length_bucket, post_hour.
+
+    Returns:
+        JSON with dimension name and list of per-cohort stats.
+    """
+    # Map dimension name to the Post column attribute
+    dimension_map = {
+        "topic": Post.topic,
+        "content_format": Post.content_format,
+        "hook_style": Post.hook_style,
+        "length_bucket": Post.length_bucket,
+        "post_hour": Post.post_hour,
+    }
+    col = dimension_map[dimension]
+
+    posts = (
+        db.query(Post)
+        .filter(col.isnot(None))
+        .order_by(Post.post_date)
+        .all()
+    )
+
+    # Group by dimension value
+    by_value: dict[str, list[Post]] = defaultdict(list)
+    for p in posts:
+        key = str(getattr(p, dimension))
+        by_value[key].append(p)
+
+    cohorts = []
+    for value, group in sorted(by_value.items()):
+        er_values = [p.engagement_rate or 0.0 for p in group]
+        ws_values = [p.weighted_score for p in group]
+        avg_er = round(sum(er_values) / len(er_values), 6)
+        avg_ws = round(sum(ws_values) / len(ws_values), 6)
+        median_er = round(statistics.median(er_values), 6)
+
+        # Best post: highest engagement_rate in this cohort
+        best_post = max(group, key=lambda p: p.engagement_rate or 0.0)
+
+        cohorts.append(
+            {
+                "value": value,
+                "post_count": len(group),
+                "avg_engagement_rate": avg_er,
+                "avg_weighted_score": avg_ws,
+                "median_engagement_rate": median_er,
+                "best_post_id": best_post.id,
+                "best_post_title": best_post.display_title,
+            }
+        )
+
+    return {"dimension": dimension, "cohorts": cohorts}
 
 
 # ---------------------------------------------------------------------------

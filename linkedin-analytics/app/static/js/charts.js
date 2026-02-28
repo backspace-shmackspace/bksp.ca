@@ -272,6 +272,280 @@ function makeDoughnutChart(canvasId, labels, values) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Analytics page
+// ---------------------------------------------------------------------------
+
+async function initAnalytics(config) {
+  const { defaultDays = 365 } = config;
+
+  // -------------------------------------------------------------------------
+  // Load engagement data and render charts
+  // -------------------------------------------------------------------------
+
+  let engagementData = null;
+
+  try {
+    const resp = await fetch(`/api/analytics/engagement?days=${defaultDays}`);
+    if (!resp.ok) throw new Error(`API error: ${resp.status}`);
+    engagementData = await resp.json();
+  } catch (e) {
+    console.error("Failed to load engagement analytics:", e);
+    return;
+  }
+
+  const { posts, monthly_medians, top_10pct_threshold, baseline, last_30d } = engagementData;
+
+  // -------------------------------------------------------------------------
+  // KPI cards: baseline vs last 30 days
+  // -------------------------------------------------------------------------
+
+  function deltaIndicator(current, baseline) {
+    if (baseline === 0) return "";
+    const diff = current - baseline;
+    const pct = ((diff / baseline) * 100).toFixed(1);
+    if (diff > 0) {
+      return `<span class="text-success text-xs ml-1">&#9650; ${pct}%</span>`;
+    } else if (diff < 0) {
+      return `<span class="text-danger text-xs ml-1">&#9660; ${Math.abs(pct)}%</span>`;
+    }
+    return `<span class="text-text-dim text-xs ml-1">=</span>`;
+  }
+
+  function kpiCard(label, baselineVal, last30Val, formatter) {
+    return `
+      <div class="bg-card rounded-xl border border-white/5 p-4">
+        <div class="text-xs text-text-dim mb-2">${label}</div>
+        <div class="flex items-end gap-2 mb-2">
+          <span class="text-xl font-mono font-semibold text-text">${formatter(last30Val)}</span>
+          ${deltaIndicator(last30Val, baselineVal)}
+        </div>
+        <div class="text-xs text-text-dim">
+          All-time avg: <span class="text-text-muted font-mono">${formatter(baselineVal)}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  const kpiEl = document.getElementById("kpiCards");
+  if (kpiEl) {
+    const pct = (v) => (v * 100).toFixed(2) + "%";
+    const ws  = (v) => v.toFixed(4);
+    kpiEl.innerHTML =
+      kpiCard("Engagement Rate (last 30d)", baseline.avg_engagement_rate, last_30d.avg_engagement_rate, pct) +
+      kpiCard("Weighted Score (last 30d)", baseline.avg_weighted_score, last_30d.avg_weighted_score, ws) +
+      kpiCard("Posts (last 30d)", baseline.post_count, last_30d.post_count, (v) => String(v)) +
+      `<div class="bg-card rounded-xl border border-white/5 p-4">
+        <div class="text-xs text-text-dim mb-2">Top 10% Threshold</div>
+        <div class="text-xl font-mono font-semibold text-warning">${(top_10pct_threshold * 100).toFixed(2)}%</div>
+        <div class="text-xs text-text-dim mt-2">Engagement rate to reach top 10%</div>
+      </div>`;
+  }
+
+  // -------------------------------------------------------------------------
+  // Engagement rate over time + rolling avg + threshold line
+  // -------------------------------------------------------------------------
+
+  const timeCtx = document.getElementById("engagementTimeChart");
+  if (timeCtx && posts.length > 0) {
+    const labels = posts.map((p) => p.post_date);
+    const erValues = posts.map((p) => parseFloat((p.engagement_rate * 100).toFixed(4)));
+    const rollingValues = posts.map((p) => parseFloat((p.rolling_avg_5 * 100).toFixed(4)));
+    const thresholdValues = labels.map(() => parseFloat((top_10pct_threshold * 100).toFixed(4)));
+
+    new Chart(timeCtx, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "Engagement Rate (%)",
+            data: erValues,
+            borderColor: COLORS.accent,
+            backgroundColor: "rgba(59,130,246,0.06)",
+            borderWidth: 2,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            fill: true,
+            tension: 0.3,
+            order: 1,
+          },
+          {
+            label: "5-Post Rolling Avg (%)",
+            data: rollingValues,
+            borderColor: COLORS.success,
+            backgroundColor: "transparent",
+            borderWidth: 2,
+            pointRadius: 0,
+            pointHoverRadius: 4,
+            fill: false,
+            tension: 0.4,
+            order: 2,
+          },
+          {
+            label: "Top 10% Threshold (%)",
+            data: thresholdValues,
+            borderColor: COLORS.warning,
+            borderDash: [6, 4],
+            borderWidth: 1,
+            pointRadius: 0,
+            fill: false,
+            tension: 0,
+            order: 3,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: "#111827",
+            borderColor: "rgba(255,255,255,0.1)",
+            borderWidth: 1,
+            padding: 10,
+            titleColor: "#f1f5f9",
+            bodyColor: "#94a3b8",
+            callbacks: {
+              label: (ctx) => ` ${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}%`,
+            },
+          },
+        },
+        scales: {
+          x: {
+            grid: { color: "rgba(255,255,255,0.04)" },
+            ticks: { maxTicksLimit: 8 },
+          },
+          y: {
+            grid: { color: "rgba(255,255,255,0.04)" },
+            beginAtZero: true,
+            title: { display: true, text: "Engagement Rate (%)", color: "#64748b", font: { size: 10 } },
+          },
+        },
+      },
+    });
+  } else if (timeCtx) {
+    timeCtx.parentElement.innerHTML =
+      '<p class="text-center text-text-dim text-xs py-16">Not enough data to render chart.</p>';
+  }
+
+  // -------------------------------------------------------------------------
+  // Monthly median bar chart
+  // -------------------------------------------------------------------------
+
+  const monthCtx = document.getElementById("monthlyMedianChart");
+  if (monthCtx && monthly_medians.length > 0) {
+    const mLabels = monthly_medians.map((m) => m.month);
+    const mValues = monthly_medians.map((m) => parseFloat((m.median_engagement_rate * 100).toFixed(4)));
+    const mCounts = monthly_medians.map((m) => m.post_count);
+
+    new Chart(monthCtx, {
+      type: "bar",
+      data: {
+        labels: mLabels,
+        datasets: [
+          {
+            label: "Median Engagement Rate (%)",
+            data: mValues,
+            backgroundColor: "rgba(59,130,246,0.6)",
+            borderColor: COLORS.accent,
+            borderWidth: 1,
+            borderRadius: 3,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: "#111827",
+            borderColor: "rgba(255,255,255,0.1)",
+            borderWidth: 1,
+            padding: 10,
+            titleColor: "#f1f5f9",
+            bodyColor: "#94a3b8",
+            callbacks: {
+              label: (ctx) => ` Median: ${ctx.parsed.y.toFixed(2)}%`,
+              afterLabel: (ctx) => ` Posts: ${mCounts[ctx.dataIndex]}`,
+            },
+          },
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { maxRotation: 30 } },
+          y: {
+            grid: { color: "rgba(255,255,255,0.04)" },
+            beginAtZero: true,
+            title: { display: true, text: "Median Engagement (%)", color: "#64748b", font: { size: 10 } },
+          },
+        },
+      },
+    });
+  } else if (monthCtx) {
+    monthCtx.parentElement.innerHTML =
+      '<p class="text-center text-text-dim text-xs py-12">Not enough data to render chart.</p>';
+  }
+
+  // -------------------------------------------------------------------------
+  // Cohort breakdown table
+  // -------------------------------------------------------------------------
+
+  async function loadCohorts(dimension) {
+    const tbody = document.getElementById("cohortTableBody");
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="6" class="py-6 text-center text-text-dim text-xs">Loading...</td></tr>';
+    try {
+      const resp = await fetch(`/api/analytics/cohorts?dimension=${dimension}`);
+      if (!resp.ok) throw new Error(`API error: ${resp.status}`);
+      const data = await resp.json();
+      if (data.cohorts.length === 0) {
+        tbody.innerHTML =
+          '<tr><td colspan="6" class="py-6 text-center text-text-dim text-xs">No tagged posts for this dimension yet.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = data.cohorts
+        .map(
+          (c) => `
+          <tr class="text-sm">
+            <td class="py-2.5 pr-4 font-mono text-xs text-text">${c.value}</td>
+            <td class="py-2.5 pr-4 text-right text-text-muted">${c.post_count}</td>
+            <td class="py-2.5 pr-4 text-right font-mono text-xs
+                       ${c.avg_engagement_rate >= 0.05 ? "text-success" : c.avg_engagement_rate >= 0.02 ? "text-warning" : "text-text-muted"}">
+              ${(c.avg_engagement_rate * 100).toFixed(2)}%
+            </td>
+            <td class="py-2.5 pr-4 text-right font-mono text-xs text-text-muted">
+              ${c.avg_weighted_score.toFixed(4)}
+            </td>
+            <td class="py-2.5 pr-4 text-right font-mono text-xs text-text-muted">
+              ${(c.median_engagement_rate * 100).toFixed(2)}%
+            </td>
+            <td class="py-2.5 text-xs text-text-muted truncate max-w-xs">
+              <a href="/dashboard/posts/${c.best_post_id}" class="hover:text-accent transition-colors">
+                ${c.best_post_title}
+              </a>
+            </td>
+          </tr>`
+        )
+        .join("");
+    } catch (e) {
+      tbody.innerHTML =
+        '<tr><td colspan="6" class="py-6 text-center text-danger text-xs">Failed to load cohort data.</td></tr>';
+      console.error("Failed to load cohorts:", e);
+    }
+  }
+
+  const dimensionSelect = document.getElementById("cohortDimension");
+  if (dimensionSelect) {
+    dimensionSelect.addEventListener("change", () => {
+      loadCohorts(dimensionSelect.value);
+    });
+    await loadCohorts(dimensionSelect.value);
+  }
+}
+
 function initAudience(config) {
   const { followerLabels, followerTotals, industry, jobTitle, seniority, location } = config;
 

@@ -37,6 +37,11 @@ class Post(Base):
     shares: int = Column(Integer, default=0)
     clicks: int = Column(Integer, default=0)
     engagement_rate: float = Column(Float, default=0.0)
+    topic: str | None = Column(String(50), nullable=True)
+    content_format: str | None = Column("content_format", String(30), nullable=True)
+    hook_style: str | None = Column(String(30), nullable=True)
+    length_bucket: str | None = Column(String(20), nullable=True)
+    post_hour: int | None = Column(Integer, nullable=True)
     created_at: datetime = Column(DateTime, default=func.now())
     updated_at: datetime = Column(DateTime, default=func.now(), onupdate=func.now())
 
@@ -54,6 +59,22 @@ class Post(Base):
         if self.linkedin_post_id:
             return f"Post {self.post_date} (#{self.linkedin_post_id[-6:]})"
         return f"Post {self.post_date}"
+
+    @property
+    def weighted_score(self) -> float:
+        """Quality-weighted engagement score.
+
+        Formula: ((1 * reactions) + (3 * comments) + (4 * shares)) / impressions
+        Comments weighted 3x (signal deeper engagement).
+        Shares weighted 4x (signal advocacy/amplification).
+        """
+        if not self.impressions or self.impressions == 0:
+            return 0.0
+        return (
+            (1 * (self.reactions or 0))
+            + (3 * (self.comments or 0))
+            + (4 * (self.shares or 0))
+        ) / self.impressions
 
     def recalculate_engagement_rate(self) -> None:
         """Recalculate engagement_rate from raw metrics."""

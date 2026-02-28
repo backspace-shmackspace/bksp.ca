@@ -418,3 +418,328 @@ class TestFollowersTrendApi:
         data = resp.json()
         assert len(data["labels"]) == 30
         assert len(data["total_followers"]) == 30
+
+
+# ---------------------------------------------------------------------------
+# Cohort seed helper
+# ---------------------------------------------------------------------------
+
+
+def _seed_cohort_posts(db: Session) -> list[Post]:
+    """Insert 6 posts with cohort metadata spanning two calendar months."""
+    today = date.today()
+    base = today - timedelta(days=80)
+    cohort_data = [
+        ("risk-management", "story",    "personal-story", "medium", 8,  2000, 80, 20, 10),
+        ("risk-management", "listicle", "statistic",      "short",  9,  1800, 60, 12,  5),
+        ("devsecops",       "tutorial", "how-to",         "long",   10, 3000, 90, 30, 15),
+        ("devsecops",       "hot-take", "contrarian",     "short",  11, 1500, 50,  8,  3),
+        ("htb-writeup",     "tutorial", "how-to",         "long",   14, 2500, 70, 18, 12),
+        ("htb-writeup",     "story",    "personal-story", "medium", 15, 2200, 65, 14,  8),
+    ]
+    posts = []
+    for i, (topic, fmt, hook, length, hour, impr, reac, comm, shar) in enumerate(
+        cohort_data
+    ):
+        post = Post(
+            post_date=base + timedelta(days=i * 10),
+            title=f"Cohort post {i + 1}",
+            post_type="text",
+            impressions=impr,
+            members_reached=int(impr * 0.8),
+            reactions=reac,
+            comments=comm,
+            shares=shar,
+            clicks=reac // 2,
+            topic=topic,
+            content_format=fmt,
+            hook_style=hook,
+            length_bucket=length,
+            post_hour=hour,
+        )
+        post.recalculate_engagement_rate()
+        db.add(post)
+        posts.append(post)
+    db.commit()
+    for p in posts:
+        db.refresh(p)
+    return posts
+
+
+# ---------------------------------------------------------------------------
+# API: analytics/engagement
+# ---------------------------------------------------------------------------
+
+
+class TestAnalyticsEngagementApi:
+    def test_engagement_empty_db(self, client):
+        """Returns valid structure with empty data."""
+        resp = client.get("/api/analytics/engagement")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "posts" in data
+        assert "monthly_medians" in data
+        assert "top_10pct_threshold" in data
+        assert "baseline" in data
+        assert "last_30d" in data
+        assert data["posts"] == []
+        assert data["monthly_medians"] == []
+        assert data["top_10pct_threshold"] == 0.0
+
+    def test_engagement_with_data(self, seeded_client):
+        """Returns posts, monthly_medians, threshold, baseline, last_30d."""
+        c, db = seeded_client
+        _seed_db(db)
+        resp = c.get("/api/analytics/engagement?days=365")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["posts"]) == 5
+        assert len(data["monthly_medians"]) >= 1
+        assert data["top_10pct_threshold"] > 0.0
+        assert data["baseline"]["post_count"] == 5
+        # Each post object has required fields
+        post = data["posts"][0]
+        assert "id" in post
+        assert "post_date" in post
+        assert "engagement_rate" in post
+        assert "weighted_score" in post
+        assert "rolling_avg_5" in post
+
+    def test_engagement_rolling_avg(self, seeded_client):
+        """Rolling average is computed for a window of 5 posts."""
+        c, db = seeded_client
+        _seed_cohort_posts(db)
+        resp = c.get("/api/analytics/engagement?days=365")
+        assert resp.status_code == 200
+        data = resp.json()
+        posts = data["posts"]
+        assert len(posts) == 6
+        # The last post's rolling_avg_5 should differ from its own engagement_rate
+        # (it averages over the 5-post window)
+        last = posts[-1]
+        assert last["rolling_avg_5"] != last["engagement_rate"] or len(posts) == 1
+
+    def test_engagement_rolling_avg_few_posts(self, seeded_client):
+        """Rolling average handles fewer than 5 posts gracefully."""
+        c, db = seeded_client
+        # Insert only 2 posts
+        today = date.today()
+        for i in range(2):
+            post = Post(
+                post_date=today - timedelta(days=i * 7),
+                impressions=1000,
+                reactions=50,
+                comments=10,
+                shares=5,
+            )
+            post.recalculate_engagement_rate()
+            db.add(post)
+        db.commit()
+        resp = c.get("/api/analytics/engagement?days=365")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["posts"]) == 2
+        # First post: rolling avg equals its own rate
+        first = data["posts"][0]
+        assert first["rolling_avg_5"] == pytest.approx(first["engagement_rate"], rel=1e-4)
+
+    def test_engagement_weighted_score(self, seeded_client):
+        """Weighted score matches manual calculation."""
+        c, db = seeded_client
+        post = Post(
+            post_date=date.today() - timedelta(days=1),
+            impressions=1000,
+            reactions=50,
+            comments=10,
+            shares=5,
+        )
+        post.recalculate_engagement_rate()
+        db.add(post)
+        db.commit()
+        resp = c.get("/api/analytics/engagement?days=365")
+        assert resp.status_code == 200
+        data = resp.json()
+        p = data["posts"][0]
+        # ((1*50) + (3*10) + (4*5)) / 1000 = 100 / 1000 = 0.1
+        assert p["weighted_score"] == pytest.approx(0.1, rel=1e-4)
+
+    def test_engagement_top_10pct_threshold(self, seeded_client):
+        """Top 10% threshold is correct for known data."""
+        c, db = seeded_client
+        _seed_db(db)
+        resp = c.get("/api/analytics/engagement?days=365")
+        assert resp.status_code == 200
+        data = resp.json()
+        threshold = data["top_10pct_threshold"]
+        rates = [p["engagement_rate"] for p in data["posts"]]
+        assert threshold >= 0.0
+        # Threshold should be >= the median engagement rate
+        assert threshold >= sorted(rates)[len(rates) // 2]
+
+    def test_engagement_invalid_days_rejected(self, client):
+        """Days parameter outside valid range returns 422."""
+        resp = client.get("/api/analytics/engagement?days=10")
+        assert resp.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# API: analytics/cohorts
+# ---------------------------------------------------------------------------
+
+
+class TestAnalyticsCohortApi:
+    def test_cohorts_empty_db(self, client):
+        """Returns valid structure with no cohorts."""
+        resp = client.get("/api/analytics/cohorts?dimension=topic")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["dimension"] == "topic"
+        assert data["cohorts"] == []
+
+    def test_cohorts_by_topic(self, seeded_client):
+        """Groups posts by topic correctly."""
+        c, db = seeded_client
+        _seed_cohort_posts(db)
+        resp = c.get("/api/analytics/cohorts?dimension=topic")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["dimension"] == "topic"
+        topics = {ch["value"] for ch in data["cohorts"]}
+        assert "risk-management" in topics
+        assert "devsecops" in topics
+        assert "htb-writeup" in topics
+        for cohort in data["cohorts"]:
+            assert cohort["post_count"] == 2
+            assert "avg_engagement_rate" in cohort
+            assert "avg_weighted_score" in cohort
+            assert "median_engagement_rate" in cohort
+            assert "best_post_id" in cohort
+
+    def test_cohorts_exclude_null(self, seeded_client):
+        """Posts without the dimension set are excluded."""
+        c, db = seeded_client
+        # One post with topic, one without
+        tagged = Post(
+            post_date=date.today() - timedelta(days=10),
+            impressions=1000,
+            reactions=50,
+            comments=10,
+            shares=5,
+            topic="devsecops",
+        )
+        tagged.recalculate_engagement_rate()
+        untagged = Post(
+            post_date=date.today() - timedelta(days=5),
+            impressions=800,
+            reactions=40,
+            comments=8,
+            shares=3,
+        )
+        untagged.recalculate_engagement_rate()
+        db.add(tagged)
+        db.add(untagged)
+        db.commit()
+        resp = c.get("/api/analytics/cohorts?dimension=topic")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["cohorts"]) == 1
+        assert data["cohorts"][0]["post_count"] == 1
+
+    def test_invalid_dimension_rejected(self, client):
+        """Unknown dimension returns 422."""
+        resp = client.get("/api/analytics/cohorts?dimension=password")
+        assert resp.status_code == 422
+
+    def test_cohorts_by_content_format(self, seeded_client):
+        """Groups posts by content_format correctly."""
+        c, db = seeded_client
+        _seed_cohort_posts(db)
+        resp = c.get("/api/analytics/cohorts?dimension=content_format")
+        assert resp.status_code == 200
+        data = resp.json()
+        formats = {ch["value"] for ch in data["cohorts"]}
+        assert "story" in formats
+        assert "tutorial" in formats
+
+
+# ---------------------------------------------------------------------------
+# API: PATCH /api/posts/{id} cohort fields
+# ---------------------------------------------------------------------------
+
+
+class TestPostUpdateCohortFields:
+    def test_update_topic(self, seeded_client):
+        """PATCH with topic updates the field."""
+        c, db = seeded_client
+        _seed_db(db)
+        post = db.query(Post).first()
+        resp = c.patch(f"/api/posts/{post.id}?topic=risk-management")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["topic"] == "risk-management"
+
+    def test_update_all_cohort_fields(self, seeded_client):
+        """PATCH with all cohort fields updates them simultaneously."""
+        c, db = seeded_client
+        _seed_db(db)
+        post = db.query(Post).first()
+        params = (
+            "topic=devsecops"
+            "&content_format=story"
+            "&hook_style=contrarian"
+            "&length_bucket=medium"
+            "&post_hour=9"
+        )
+        resp = c.patch(f"/api/posts/{post.id}?{params}")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["topic"] == "devsecops"
+        assert data["content_format"] == "story"
+        assert data["hook_style"] == "contrarian"
+        assert data["length_bucket"] == "medium"
+        assert data["post_hour"] == 9
+
+    def test_clear_cohort_field(self, seeded_client):
+        """PATCH with empty string clears the field to null."""
+        c, db = seeded_client
+        _seed_db(db)
+        post = db.query(Post).first()
+        # First set a value
+        c.patch(f"/api/posts/{post.id}?topic=risk-management")
+        # Then clear it
+        resp = c.patch(f"/api/posts/{post.id}?topic=")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["topic"] is None
+
+    def test_topic_normalized_on_input(self, seeded_client):
+        """Topic with mixed case and spaces is normalized to lowercase hyphenated form."""
+        c, db = seeded_client
+        _seed_db(db)
+        post = db.query(Post).first()
+        resp = c.patch(f"/api/posts/{post.id}?topic=Risk+Management")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["topic"] == "risk-management"
+
+
+# ---------------------------------------------------------------------------
+# Dashboard: analytics page route
+# ---------------------------------------------------------------------------
+
+
+class TestAnalyticsPage:
+    def test_analytics_page_empty_db(self, client):
+        """Page renders without error when the database is empty."""
+        resp = client.get("/dashboard/analytics")
+        assert resp.status_code == 200
+        content = resp.content.lower()
+        assert b"analytics" in content
+
+    def test_analytics_page_with_data(self, seeded_client):
+        """Page renders successfully when posts exist."""
+        c, db = seeded_client
+        _seed_db(db)
+        resp = c.get("/dashboard/analytics")
+        assert resp.status_code == 200
+        assert resp.status_code == 200

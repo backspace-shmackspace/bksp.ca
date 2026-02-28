@@ -140,6 +140,22 @@ async def post_detail(
     )
 
 
+@router.get("/dashboard/analytics", response_class=HTMLResponse)
+async def analytics(
+    request: Request,
+    db: Session = Depends(get_session),
+) -> HTMLResponse:
+    """Render the engagement analytics page."""
+    total_posts = db.query(func.count(Post.id)).scalar() or 0
+    return templates.TemplateResponse(
+        request,
+        "analytics.html",
+        {
+            "has_data": total_posts > 0,
+        },
+    )
+
+
 @router.get("/dashboard/audience", response_class=HTMLResponse)
 async def audience(
     request: Request,

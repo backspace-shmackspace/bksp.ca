@@ -77,6 +77,61 @@ class TestPostModel:
         assert "Post" in repr_str
         assert "2025-11-01" in repr_str
 
+    def test_weighted_score_calculation(self, test_session):
+        """Weighted score formula: ((1*reactions) + (3*comments) + (4*shares)) / impressions."""
+        post = Post(
+            post_date=date(2025, 11, 1),
+            impressions=1000,
+            reactions=50,
+            comments=10,
+            shares=5,
+        )
+        # ((1*50) + (3*10) + (4*5)) / 1000 = (50 + 30 + 20) / 1000 = 0.1
+        assert post.weighted_score == pytest.approx(0.1, rel=1e-6)
+
+    def test_weighted_score_zero_impressions(self, test_session):
+        """Returns 0.0 when impressions is 0."""
+        post = Post(post_date=date(2025, 11, 1), impressions=0, reactions=10)
+        assert post.weighted_score == 0.0
+
+    def test_weighted_score_none_impressions(self, test_session):
+        """Returns 0.0 when impressions is None."""
+        post = Post(post_date=date(2025, 11, 1))
+        post.impressions = None
+        assert post.weighted_score == 0.0
+
+    def test_cohort_fields_nullable(self, test_session):
+        """All cohort columns accept null values (default state)."""
+        post = Post(post_date=date(2025, 11, 1))
+        test_session.add(post)
+        test_session.commit()
+        test_session.refresh(post)
+        assert post.topic is None
+        assert post.content_format is None
+        assert post.hook_style is None
+        assert post.length_bucket is None
+        assert post.post_hour is None
+
+    def test_cohort_fields_persist(self, test_session):
+        """Set and retrieve topic, content_format, hook_style, length_bucket, post_hour."""
+        post = Post(
+            post_date=date(2025, 11, 1),
+            topic="risk-management",
+            content_format="story",
+            hook_style="personal-story",
+            length_bucket="medium",
+            post_hour=9,
+        )
+        test_session.add(post)
+        test_session.commit()
+        test_session.refresh(post)
+
+        assert post.topic == "risk-management"
+        assert post.content_format == "story"
+        assert post.hook_style == "personal-story"
+        assert post.length_bucket == "medium"
+        assert post.post_hour == 9
+
 
 class TestDailyMetricModel:
     """Tests for the DailyMetric model."""
