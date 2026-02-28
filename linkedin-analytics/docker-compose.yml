@@ -1,0 +1,25 @@
+services:
+  app:
+    build: .
+    ports:
+      - "${APP_PORT:-8050}:8050"
+    volumes:
+      # Bind mount so the SQLite database is at a known host path for backups.
+      # Do NOT use a named Docker volume here: that would hide the file from
+      # host-level backup tools and make restores harder.
+      - ./data:/app/data
+    env_file:
+      - .env
+    environment:
+      - DATA_DIR=/app/data
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8050/health')"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

@@ -1,0 +1,57 @@
+{# Post metrics table partial.
+   Variables:
+     posts      - list of Post ORM objects
+     show_links - bool, whether to link post titles to /dashboard/posts/{id}
+#}
+<div class="overflow-x-auto">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="border-b border-white/5">
+        <th class="text-left text-text-dim font-medium pb-3 pr-4">Date</th>
+        <th class="text-left text-text-dim font-medium pb-3 pr-4">Post</th>
+        <th class="text-right text-text-dim font-medium pb-3 pr-4">Impressions</th>
+        <th class="text-right text-text-dim font-medium pb-3 pr-4">Reactions</th>
+        <th class="text-right text-text-dim font-medium pb-3 pr-4">Comments</th>
+        <th class="text-right text-text-dim font-medium pb-3 pr-4">Shares</th>
+        <th class="text-right text-text-dim font-medium pb-3">Eng. Rate</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-white/5">
+      {% for post in posts %}
+      <tr class="hover:bg-white/2 transition-colors">
+        <td class="py-3 pr-4 text-text-dim font-mono text-xs whitespace-nowrap">{{ post.post_date }}</td>
+        <td class="py-3 pr-4 max-w-xs">
+          {% if show_links | default(true) %}
+            <a href="/dashboard/posts/{{ post.id }}" class="text-text hover:text-accent transition-colors line-clamp-2">
+              {{ post.title or "(no title)" }}
+            </a>
+          {% else %}
+            <span class="text-text line-clamp-2">{{ post.title or "(no title)" }}</span>
+          {% endif %}
+          {% if post.post_type %}
+            <span class="inline-block mt-0.5 text-xs text-text-dim bg-white/5 px-1.5 py-0.5 rounded">
+              {{ post.post_type }}
+            </span>
+          {% endif %}
+        </td>
+        <td class="py-3 pr-4 text-right font-mono text-text">{{ "{:,}".format(post.impressions) }}</td>
+        <td class="py-3 pr-4 text-right font-mono text-text">{{ "{:,}".format(post.reactions) }}</td>
+        <td class="py-3 pr-4 text-right font-mono text-text">{{ "{:,}".format(post.comments) }}</td>
+        <td class="py-3 pr-4 text-right font-mono text-text">{{ "{:,}".format(post.shares) }}</td>
+        <td class="py-3 text-right font-mono
+                   {% if post.engagement_rate >= 0.05 %}text-success
+                   {% elif post.engagement_rate >= 0.02 %}text-warning
+                   {% else %}text-text-muted{% endif %}">
+          {{ "%.1f%%"|format(post.engagement_rate * 100) }}
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="7" class="py-8 text-center text-text-dim text-sm">
+          No posts found. Upload a LinkedIn export to get started.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

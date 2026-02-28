@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}Audience{% endblock %}
+{% block page_title %}Audience{% endblock %}
+{% block page_subtitle %}Demographics and follower growth{% endblock %}
+
+{% block content %}
+
+{% if not has_data %}
+  <!-- Empty state -->
+  <div class="flex flex-col items-center justify-center py-24 text-center">
+    <div class="w-16 h-16 bg-card rounded-2xl flex items-center justify-center mb-5 border border-white/5">
+      <svg class="w-8 h-8 text-text-dim" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    </div>
+    <h2 class="text-lg font-semibold text-text mb-2">No audience data yet</h2>
+    <p class="text-text-muted text-sm max-w-sm mb-6">
+      Upload a LinkedIn analytics export that includes the FOLLOWERS and DEMOGRAPHICS sheets.
+    </p>
+    <a href="/upload"
+       class="inline-flex items-center gap-2 bg-accent hover:bg-accent-hover text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+      Upload Export
+    </a>
+  </div>
+
+{% else %}
+
+  <!-- Follower growth chart -->
+  {% if follower_trend %}
+  <div class="bg-card rounded-xl border border-white/5 p-5 mb-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-sm font-medium text-text">Follower Growth (90 days)</h3>
+      <div class="text-xs text-text-dim">
+        Latest: <span class="font-mono text-text">{{ "{:,}".format(follower_trend[-1].total_followers) }}</span>
+      </div>
+    </div>
+    <div class="h-48">
+      <canvas id="followerChart"></canvas>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if latest_demo_date %}
+  <!-- Demographic charts: 2-column grid -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+    <!-- Industry -->
+    {% if demographics.industry %}
+    <div class="bg-card rounded-xl border border-white/5 p-5">
+      <h3 class="text-sm font-medium text-text mb-4">Top Industries</h3>
+      <div class="h-56">
+        <canvas id="industryChart"></canvas>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Job Title -->
+    {% if demographics.job_title %}
+    <div class="bg-card rounded-xl border border-white/5 p-5">
+      <h3 class="text-sm font-medium text-text mb-4">Job Titles</h3>
+      <div class="h-56">
+        <canvas id="jobTitleChart"></canvas>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Seniority -->
+    {% if demographics.seniority %}
+    <div class="bg-card rounded-xl border border-white/5 p-5">
+      <h3 class="text-sm font-medium text-text mb-4">Seniority Levels</h3>
+      <div class="h-56">
+        <canvas id="seniorityChart"></canvas>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Location -->
+    {% if demographics.location %}
+    <div class="bg-card rounded-xl border border-white/5 p-5">
+      <h3 class="text-sm font-medium text-text mb-4">Locations</h3>
+      <div class="h-56">
+        <canvas id="locationChart"></canvas>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <p class="mt-4 text-xs text-text-dim text-right">
+    Demographics as of {{ latest_demo_date }}
+  </p>
+  {% endif %}
+
+{% endif %}
+
+{% endblock %}
+
+
+{% block scripts %}
+<script src="/static/js/charts.js"></script>
+{% if has_data %}
+<script>
+  const audienceConfig = {
+    followerLabels:  {{ follower_trend | map(attribute='snapshot_date') | map('string') | list | tojson }},
+    followerTotals:  {{ follower_trend | map(attribute='total_followers') | list | tojson }},
+    industry: {
+      labels: {{ (demographics.industry or []) | map(attribute='value') | list | tojson }},
+      values: {{ (demographics.industry or []) | map(attribute='percentage') | list | tojson }},
+    },
+    jobTitle: {
+      labels: {{ (demographics.job_title or []) | map(attribute='value') | list | tojson }},
+      values: {{ (demographics.job_title or []) | map(attribute='percentage') | list | tojson }},
+    },
+    seniority: {
+      labels: {{ (demographics.seniority or []) | map(attribute='value') | list | tojson }},
+      values: {{ (demographics.seniority or []) | map(attribute='percentage') | list | tojson }},
+    },
+    location: {
+      labels: {{ (demographics.location or []) | map(attribute='value') | list | tojson }},
+      values: {{ (demographics.location or []) | map(attribute='percentage') | list | tojson }},
+    },
+  };
+  initAudience(audienceConfig);
+</script>
+{% endif %}
+{% endblock %}

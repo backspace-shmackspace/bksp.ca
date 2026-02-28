@@ -1,0 +1,17 @@
+{# KPI card partial.
+   Usage: {% include "_partials/kpi_card.html" with { label, value, sublabel, accent } %}
+   Variables:
+     label    - Card heading (string)
+     value    - Primary metric display value (string or number)
+     sublabel - Small text below the value (string, optional)
+     accent   - True to show an accent-colored left border (bool, optional)
+#}
+<div class="bg-card rounded-xl border border-white/5 p-5
+            {% if accent %}border-l-2 border-l-accent{% endif %}
+            flex flex-col gap-1">
+  <span class="text-xs font-medium text-text-muted uppercase tracking-wide">{{ label }}</span>
+  <span class="text-2xl font-semibold text-text font-mono">{{ value }}</span>
+  {% if sublabel %}
+    <span class="text-xs text-text-dim">{{ sublabel }}</span>
+  {% endif %}
+</div>

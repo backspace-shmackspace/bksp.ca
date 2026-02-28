@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}Upload{% endblock %}
+{% block page_title %}Upload Export{% endblock %}
+{% block page_subtitle %}Import a LinkedIn analytics export file{% endblock %}
+
+{% block content %}
+
+<!-- Flash message -->
+{% if flash %}
+<div class="mb-6 rounded-lg border px-4 py-3 text-sm
+            {% if flash_type == 'error' %}bg-danger/10 border-danger/20 text-red-300
+            {% elif flash_type == 'warning' %}bg-warning/10 border-warning/20 text-yellow-300
+            {% else %}bg-success/10 border-success/20 text-green-300{% endif %}">
+  <div class="flex items-start gap-2">
+    <svg class="w-4 h-4 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      {% if flash_type == 'error' %}
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      {% elif flash_type == 'warning' %}
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      {% else %}
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M5 13l4 4L19 7" />
+      {% endif %}
+    </svg>
+    <span>{{ flash }}</span>
+  </div>
+</div>
+{% endif %}
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+  <!-- Upload form -->
+  <div class="bg-card rounded-xl border border-white/5 p-6">
+    <h2 class="text-sm font-semibold text-text mb-1">Import LinkedIn Export</h2>
+    <p class="text-xs text-text-muted mb-5">
+      Download your analytics from
+      <a href="https://www.linkedin.com/analytics/creator/content/" target="_blank" rel="noopener"
+         class="text-accent hover:underline">linkedin.com/analytics/creator/content/</a>
+      then upload the .xlsx or .xls file here.
+    </p>
+
+    <form id="upload-form" action="/upload" method="post" enctype="multipart/form-data">
+      <!-- Drag-and-drop zone -->
+      <div
+        id="drop-zone"
+        class="border-2 border-dashed border-white/10 rounded-xl p-8 text-center cursor-pointer
+               hover:border-accent/40 hover:bg-accent/5 transition-all mb-4"
+        onclick="document.getElementById('file-input').click()"
+      >
+        <svg class="w-10 h-10 text-text-dim mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+        </svg>
+        <p class="text-sm text-text-muted mb-1">Drop your export file here or click to browse</p>
+        <p class="text-xs text-text-dim">Accepts .xlsx, .xls, .csv (max 50 MB)</p>
+        <div id="file-name-display" class="mt-3 hidden">
+          <span class="inline-block bg-accent/15 text-accent text-xs font-mono px-3 py-1 rounded-full" id="file-name-text"></span>
+        </div>
+      </div>
+
+      <input
+        id="file-input"
+        type="file"
+        name="file"
+        accept=".xlsx,.xls,.csv"
+        class="hidden"
+        required
+      />
+
+      <button
+        type="submit"
+        id="submit-btn"
+        class="w-full bg-accent hover:bg-accent-hover text-white text-sm font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        Import Export
+      </button>
+    </form>
+
+    <!-- Instructions -->
+    <div class="mt-5 pt-5 border-t border-white/5">
+      <h3 class="text-xs font-medium text-text-muted uppercase tracking-wide mb-3">How to export</h3>
+      <ol class="space-y-2 text-xs text-text-dim">
+        <li class="flex gap-2">
+          <span class="text-accent font-mono shrink-0">1.</span>
+          Go to <span class="font-mono text-text-muted">linkedin.com/analytics/creator/content/</span>
+        </li>
+        <li class="flex gap-2">
+          <span class="text-accent font-mono shrink-0">2.</span>
+          Click the Export button in the top right corner
+        </li>
+        <li class="flex gap-2">
+          <span class="text-accent font-mono shrink-0">3.</span>
+          Choose a date range (max 365 days)
+        </li>
+        <li class="flex gap-2">
+          <span class="text-accent font-mono shrink-0">4.</span>
+          Download the .xlsx file and upload it here
+        </li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- Upload history -->
+  <div class="bg-card rounded-xl border border-white/5 p-6">
+    <h2 class="text-sm font-semibold text-text mb-4">Import History</h2>
+
+    {% if uploads %}
+    <div class="space-y-3">
+      {% for upload in uploads %}
+      <div class="flex items-start justify-between gap-3 py-3 border-b border-white/5 last:border-0">
+        <div class="min-w-0">
+          <p class="text-sm text-text truncate" title="{{ upload.filename }}">{{ upload.filename }}</p>
+          <p class="text-xs text-text-dim mt-0.5 font-mono">
+            {{ upload.upload_date.strftime("%Y-%m-%d %H:%M") if upload.upload_date else "—" }}
+          </p>
+        </div>
+        <div class="shrink-0 text-right">
+          <span class="inline-block text-xs font-mono
+                       {% if upload.status == 'completed' %}text-success
+                       {% elif upload.status == 'failed' %}text-danger
+                       {% else %}text-warning{% endif %}">
+            {{ upload.status }}
+          </span>
+          <p class="text-xs text-text-dim mt-0.5">{{ upload.records_imported }} records</p>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-text-dim py-6 text-center">No imports yet.</p>
+    {% endif %}
+  </div>
+
+</div>
+
+{% endblock %}
+
+
+{% block scripts %}
+<script src="/static/js/upload.js"></script>
+{% endblock %}

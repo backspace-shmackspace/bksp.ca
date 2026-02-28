@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}LinkedIn Analytics{% endblock %} — bksp_</title>
+
+  <!-- Google Fonts: Inter + JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy:   { DEFAULT: "#0a0f1a", 800: "#0d1424", 700: "#111827" },
+            card:   "#111827",
+            accent: { DEFAULT: "#3b82f6", hover: "#2563eb", muted: "#1d4ed8" },
+            text:   { DEFAULT: "#f1f5f9", muted: "#94a3b8", dim: "#64748b" },
+            success: "#22c55e",
+            warning: "#f59e0b",
+            danger:  "#ef4444",
+          },
+          fontFamily: {
+            sans: ["Inter", "system-ui", "sans-serif"],
+            mono: ["JetBrains Mono", "monospace"],
+          },
+        },
+      },
+    };
+  </script>
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+
+  <!-- Custom styles -->
+  <link rel="stylesheet" href="/static/css/style.css" />
+
+  {% block head_extra %}{% endblock %}
+</head>
+<body class="h-full bg-navy text-text font-sans">
+
+  <div class="flex h-full min-h-screen">
+
+    <!-- Sidebar navigation -->
+    <aside class="w-56 shrink-0 bg-navy-800 border-r border-white/5 flex flex-col">
+      <!-- Logo -->
+      <div class="px-5 py-6 border-b border-white/5">
+        <a href="/dashboard" class="block">
+          <span class="font-mono text-accent text-lg font-medium tracking-tight">bksp_</span>
+          <span class="block text-text-muted text-xs mt-0.5">LinkedIn Analytics</span>
+        </a>
+      </div>
+
+      <!-- Nav links -->
+      <nav class="flex-1 px-3 py-4 space-y-1">
+        {% set current_path = request.url.path %}
+        {% set nav_items = [
+          ("/dashboard",          "Dashboard",    "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"),
+          ("/dashboard/audience", "Audience",     "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"),
+          ("/upload",             "Upload",       "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"),
+        ] %}
+        {% for href, label, icon_path in nav_items %}
+          {% set is_active = current_path == href or (href != "/dashboard" and current_path.startswith(href)) %}
+          <a
+            href="{{ href }}"
+            class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors
+                   {% if is_active %}bg-accent/15 text-accent font-medium{% else %}text-text-muted hover:text-text hover:bg-white/5{% endif %}"
+          >
+            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ icon_path }}" />
+            </svg>
+            {{ label }}
+          </a>
+        {% endfor %}
+      </nav>
+
+      <!-- Footer -->
+      <div class="px-5 py-4 border-t border-white/5">
+        <a
+          href="/api/export/db"
+          class="flex items-center gap-2 text-xs text-text-dim hover:text-text-muted transition-colors"
+          title="Download SQLite database backup"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          Export DB backup
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main content area -->
+    <div class="flex-1 flex flex-col min-w-0 overflow-auto">
+
+      <!-- Top bar -->
+      <header class="sticky top-0 z-10 bg-navy/90 backdrop-blur border-b border-white/5 px-6 py-3 flex items-center justify-between">
+        <div>
+          <h1 class="text-base font-semibold text-text">{% block page_title %}Dashboard{% endblock %}</h1>
+          <p class="text-xs text-text-muted">{% block page_subtitle %}LinkedIn content analytics{% endblock %}</p>
+        </div>
+        <div class="flex items-center gap-3">
+          {% block header_actions %}{% endblock %}
+          <a
+            href="/upload"
+            class="inline-flex items-center gap-1.5 bg-accent hover:bg-accent-hover text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            Import Export
+          </a>
+        </div>
+      </header>
+
+      <!-- Page content -->
+      <main class="flex-1 p-6">
+        {% block content %}{% endblock %}
+      </main>
+
+    </div>
+  </div>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>
