@@ -4,7 +4,7 @@ import logging
 from datetime import date, timedelta
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import desc, func
@@ -178,13 +178,12 @@ async def analytics(
 @router.get("/dashboard/settings", response_class=HTMLResponse)
 async def dashboard_settings(
     request: Request,
-    response: Response,
     db: Session = Depends(get_session),
 ) -> HTMLResponse:
     """Render the settings page with OAuth connection status."""
     from app.oauth import get_auth_status
-    from app.routes.oauth_routes import generate_nonce_cookie
     from datetime import datetime, timezone
+    import secrets as _secrets
 
     auth_status = None
     disconnect_csrf_token = None
@@ -192,7 +191,8 @@ async def dashboard_settings(
 
     if settings.oauth_enabled:
         auth_status = get_auth_status(db)
-        nonce = generate_nonce_cookie(response)
+        # Generate nonce and CSRF token before rendering the template.
+        nonce = _secrets.token_urlsafe(32)
         from app.oauth import generate_disconnect_csrf_token
         disconnect_csrf_token = generate_disconnect_csrf_token(nonce)
 
@@ -223,7 +223,7 @@ async def dashboard_settings(
     _KNOWN_ERRORS = {"user_cancelled_authorize", "token_exchange_failed"}
     flash_error = error_param if error_param in _KNOWN_ERRORS else ("unknown_error" if error_param else None)
 
-    return templates.TemplateResponse(
+    resp = templates.TemplateResponse(
         request,
         "settings.html",
         {
@@ -239,11 +239,22 @@ async def dashboard_settings(
         },
     )
 
+    # Set the nonce cookie on the actual response after template rendering.
+    if nonce:
+        resp.set_cookie(
+            key="disconnect_nonce",
+            value=nonce,
+            httponly=True,
+            samesite="lax",
+            secure=False,
+        )
+
+    return resp
+
 
 @router.get("/dashboard/compose", response_class=HTMLResponse)
 async def compose(
     request: Request,
-    response: Response,
     draft: str | None = None,
     post_id: int | None = None,
     db: Session = Depends(get_session),
@@ -255,9 +266,10 @@ async def compose(
     If ?post_id=N is provided, pre-loads a saved draft post for editing.
     """
     from app.oauth import get_auth_status
-    from app.routes.api import generate_publish_nonce_cookie, list_draft_files, read_draft_file
+    from app.routes.api import list_draft_files, read_draft_file
     import hashlib as _hashlib
     import hmac as _hmac
+    import secrets as _secrets
 
     auth_status = None
     if settings.oauth_enabled:
@@ -269,8 +281,8 @@ async def compose(
         and "w_member_social" in auth_status.scopes
     )
 
-    # Generate CSRF nonce for publish action
-    nonce = generate_publish_nonce_cookie(response)
+    # Generate publish CSRF nonce and token before rendering.
+    nonce = _secrets.token_urlsafe(32)
     key = settings.token_encryption_key.encode() if settings.token_encryption_key else b""
     if key:
         message = f"publish:{nonce}".encode()
@@ -301,7 +313,7 @@ async def compose(
 
     available_drafts = list_draft_files()
 
-    return templates.TemplateResponse(
+    resp = templates.TemplateResponse(
         request,
         "compose.html",
         {
@@ -316,6 +328,17 @@ async def compose(
             "existing_post": existing_post,
         },
     )
+
+    # Set the publish nonce cookie on the actual response.
+    resp.set_cookie(
+        key="publish_nonce",
+        value=nonce,
+        httponly=True,
+        samesite="lax",
+        secure=False,
+    )
+
+    return resp
 
 
 @router.get("/dashboard/posts", response_class=HTMLResponse)
