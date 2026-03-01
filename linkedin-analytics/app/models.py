@@ -160,3 +160,21 @@ class Upload(Base):
 
     def __repr__(self) -> str:
         return f"<Upload id={self.id} file={self.filename} status={self.status}>"
+
+
+class OAuthToken(Base):
+    __tablename__ = "oauth_tokens"
+
+    id: int = Column(Integer, primary_key=True, autoincrement=True)
+    provider: str = Column(String, nullable=False, default="linkedin", unique=True)
+    access_token_encrypted: str = Column(String, nullable=False)
+    refresh_token_encrypted: str = Column(String, nullable=False)
+    access_token_expires_at: datetime = Column(DateTime, nullable=False)
+    refresh_token_expires_at: datetime = Column(DateTime, nullable=False)
+    scopes: str = Column(String, nullable=False)  # space-separated scope list
+    linkedin_member_id: str | None = Column(String, nullable=True)  # URN sub from /userinfo
+    created_at: datetime = Column(DateTime, default=func.now())
+    updated_at: datetime = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    def __repr__(self) -> str:
+        return f"<OAuthToken provider={self.provider} expires_at={self.access_token_expires_at}>"

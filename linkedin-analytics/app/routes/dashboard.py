@@ -1,15 +1,16 @@
-"""Dashboard page routes: main view, post detail, audience."""
+"""Dashboard page routes: main view, post detail, audience, settings."""
 
 import logging
 from datetime import date, timedelta
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_session
 from app.models import DailyMetric, DemographicSnapshot, FollowerSnapshot, Post, Upload
 
@@ -152,6 +153,71 @@ async def analytics(
         "analytics.html",
         {
             "has_data": total_posts > 0,
+        },
+    )
+
+
+@router.get("/dashboard/settings", response_class=HTMLResponse)
+async def dashboard_settings(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_session),
+) -> HTMLResponse:
+    """Render the settings page with OAuth connection status."""
+    from app.oauth import get_auth_status
+    from app.routes.oauth_routes import generate_nonce_cookie
+    from datetime import datetime, timezone
+
+    auth_status = None
+    disconnect_csrf_token = None
+    nonce = None
+
+    if settings.oauth_enabled:
+        auth_status = get_auth_status(db)
+        nonce = generate_nonce_cookie(response)
+        from app.oauth import generate_disconnect_csrf_token
+        disconnect_csrf_token = generate_disconnect_csrf_token(nonce)
+
+    # Compute relative expiry displays for the template.
+    access_expires_days = None
+    refresh_expires_days = None
+    refresh_warning = False
+
+    if auth_status and auth_status.connected:
+        now = datetime.now(timezone.utc)
+        if auth_status.expires_at:
+            expires_at = auth_status.expires_at
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+            access_expires_days = (expires_at - now).days
+        if auth_status.refresh_expires_at:
+            refresh_expires_at = auth_status.refresh_expires_at
+            if refresh_expires_at.tzinfo is None:
+                refresh_expires_at = refresh_expires_at.replace(tzinfo=timezone.utc)
+            refresh_expires_days = (refresh_expires_at - now).days
+            refresh_warning = refresh_expires_days <= 30
+
+    connected_param = request.query_params.get("connected")
+    disconnected_param = request.query_params.get("disconnected")
+    error_param = request.query_params.get("error")
+
+    # Whitelist known error values to prevent reflected content injection.
+    _KNOWN_ERRORS = {"user_cancelled_authorize", "token_exchange_failed"}
+    flash_error = error_param if error_param in _KNOWN_ERRORS else ("unknown_error" if error_param else None)
+
+    return templates.TemplateResponse(
+        request,
+        "settings.html",
+        {
+            "oauth_enabled": settings.oauth_enabled,
+            "auth_status": auth_status,
+            "disconnect_csrf_token": disconnect_csrf_token,
+            "access_expires_days": access_expires_days,
+            "refresh_expires_days": refresh_expires_days,
+            "refresh_warning": refresh_warning,
+            "flash_connected": connected_param == "1",
+            "flash_disconnected": disconnected_param == "1",
+            "flash_error": flash_error,
         },
     )
 

@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block title %}Settings{% endblock %}
+
+{% block page_title %}Settings{% endblock %}
+{% block page_subtitle %}LinkedIn account connection and OAuth configuration{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl space-y-6">
+
+  {# -------------------------------------------------------------------------
+     Flash messages
+  -------------------------------------------------------------------------- #}
+  {% if flash_connected %}
+  <div class="flex items-center gap-3 bg-success/10 border border-success/30 text-success rounded-xl px-4 py-3 text-sm">
+    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+    </svg>
+    LinkedIn account connected successfully.
+  </div>
+  {% endif %}
+
+  {% if flash_disconnected %}
+  <div class="flex items-center gap-3 bg-warning/10 border border-warning/30 text-warning rounded-xl px-4 py-3 text-sm">
+    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+    LinkedIn account disconnected.
+  </div>
+  {% endif %}
+
+  {% if flash_error %}
+  <div class="flex items-center gap-3 bg-danger/10 border border-danger/30 text-danger rounded-xl px-4 py-3 text-sm">
+    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+    {% if flash_error == "user_cancelled_authorize" %}
+      Authorization cancelled. You can try connecting again below.
+    {% elif flash_error == "token_exchange_failed" %}
+      Token exchange failed. Check that your LinkedIn app credentials are correct and try again.
+    {% else %}
+      An unexpected error occurred during authorization. Please try again.
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {# -------------------------------------------------------------------------
+     OAuth not configured: setup instructions
+  -------------------------------------------------------------------------- #}
+  {% if not oauth_enabled %}
+  <div class="bg-card rounded-2xl border border-white/5 p-6 space-y-4">
+    <div class="flex items-center gap-3">
+      <div class="w-2.5 h-2.5 rounded-full bg-text-dim shrink-0"></div>
+      <h2 class="text-base font-semibold text-text">LinkedIn Connection</h2>
+      <span class="ml-auto text-xs font-mono text-text-dim bg-white/5 px-2 py-0.5 rounded">Not configured</span>
+    </div>
+    <p class="text-sm text-text-muted">
+      OAuth is not configured. Set the following environment variables to enable LinkedIn account connection.
+    </p>
+
+    <details class="group">
+      <summary class="cursor-pointer text-sm text-accent hover:text-accent-hover select-none list-none flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
+        Show setup instructions
+      </summary>
+      <div class="mt-4 space-y-4">
+        <ol class="text-sm text-text-muted space-y-2 list-decimal list-inside">
+          <li>Create a LinkedIn developer app at <a href="https://developer.linkedin.com" target="_blank" class="text-accent hover:underline">developer.linkedin.com</a>.</li>
+          <li>Add the "Share on LinkedIn" product (auto-granted).</li>
+          <li>Set the OAuth 2.0 redirect URL to <code class="font-mono text-xs bg-white/5 px-1.5 py-0.5 rounded">http://localhost:8050/oauth/callback</code>.</li>
+          <li>Copy the client ID and secret to your <code class="font-mono text-xs bg-white/5 px-1.5 py-0.5 rounded">.env</code> file.</li>
+          <li>Generate a Fernet key and add it to your <code class="font-mono text-xs bg-white/5 px-1.5 py-0.5 rounded">.env</code> file.</li>
+        </ol>
+        <div class="rounded-xl bg-navy border border-white/5 p-4 font-mono text-xs text-text-muted space-y-1">
+          <p class="text-text-dim"># Add to .env</p>
+          <p>LINKEDIN_CLIENT_ID=your_client_id</p>
+          <p>LINKEDIN_CLIENT_SECRET=your_client_secret</p>
+          <p>TOKEN_ENCRYPTION_KEY=<span class="text-text-dim"># run: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"</span></p>
+          <p>LINKEDIN_REDIRECT_URI=http://localhost:8050/oauth/callback</p>
+        </div>
+      </div>
+    </details>
+  </div>
+
+  {# -------------------------------------------------------------------------
+     OAuth configured but not connected
+  -------------------------------------------------------------------------- #}
+  {% elif not auth_status or not auth_status.connected %}
+  <div class="bg-card rounded-2xl border border-white/5 p-6 space-y-4">
+    <div class="flex items-center gap-3">
+      <div class="w-2.5 h-2.5 rounded-full bg-text-dim shrink-0"></div>
+      <h2 class="text-base font-semibold text-text">LinkedIn Connection</h2>
+      <span class="ml-auto text-xs font-mono text-text-dim bg-white/5 px-2 py-0.5 rounded">Not connected</span>
+    </div>
+    <p class="text-sm text-text-muted">
+      Connect your LinkedIn account to enable automatic data sync in a future update.
+      The dashboard continues to work with manual XLSX exports in the meantime.
+    </p>
+    <a
+      href="/oauth/authorize"
+      class="inline-flex items-center gap-2 bg-accent hover:bg-accent-hover text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+    >
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+      </svg>
+      Connect LinkedIn Account
+    </a>
+    {% if auth_status and auth_status.needs_reauth %}
+    <p class="text-xs text-warning">
+      Your refresh token has expired. Click Connect to re-authorize.
+    </p>
+    {% endif %}
+  </div>
+
+  {# -------------------------------------------------------------------------
+     Connected
+  -------------------------------------------------------------------------- #}
+  {% else %}
+  <div class="bg-card rounded-2xl border border-white/5 p-6 space-y-5">
+    <div class="flex items-center gap-3">
+      <div class="w-2.5 h-2.5 rounded-full bg-success shrink-0"></div>
+      <h2 class="text-base font-semibold text-text">LinkedIn Connection</h2>
+      <span class="ml-auto text-xs font-mono text-success bg-success/10 px-2 py-0.5 rounded">Connected</span>
+    </div>
+
+    {# Refresh token warning #}
+    {% if refresh_warning %}
+    <div class="flex items-start gap-3 bg-warning/10 border border-warning/30 text-warning rounded-xl px-4 py-3 text-sm">
+      <svg class="w-4 h-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+      <div>
+        <p class="font-medium">Re-authorization recommended</p>
+        <p class="text-xs mt-0.5 text-warning/80">
+          Your refresh token expires in {{ refresh_expires_days }} day{% if refresh_expires_days != 1 %}s{% endif %}.
+          Click "Connect LinkedIn Account" to renew before it expires.
+        </p>
+      </div>
+    </div>
+    {% endif %}
+
+    {# Token metadata table #}
+    <dl class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+
+      {% if auth_status.member_id %}
+      <dt class="text-text-muted">Member ID</dt>
+      <dd class="font-mono text-xs text-text">{{ auth_status.member_id }}</dd>
+      {% endif %}
+
+      {% if auth_status.expires_at %}
+      <dt class="text-text-muted">Access token expires</dt>
+      <dd class="text-text">
+        {{ auth_status.expires_at.strftime("%Y-%m-%d") }}
+        <span class="text-text-dim text-xs ml-1">
+          (in {{ access_expires_days }} day{% if access_expires_days != 1 %}s{% endif %})
+        </span>
+      </dd>
+      {% endif %}
+
+      {% if auth_status.refresh_expires_at %}
+      <dt class="text-text-muted">Refresh token expires</dt>
+      <dd class="{% if refresh_warning %}text-warning{% else %}text-text{% endif %}">
+        {{ auth_status.refresh_expires_at.strftime("%Y-%m-%d") }}
+        <span class="text-xs ml-1 opacity-70">
+          (in {{ refresh_expires_days }} day{% if refresh_expires_days != 1 %}s{% endif %})
+        </span>
+      </dd>
+      {% endif %}
+
+      {% if auth_status.scopes %}
+      <dt class="text-text-muted">Granted scopes</dt>
+      <dd class="font-mono text-xs text-text space-x-1">
+        {% for scope in auth_status.scopes %}
+        <span class="bg-white/5 px-1.5 py-0.5 rounded">{{ scope }}</span>
+        {% endfor %}
+      </dd>
+      {% endif %}
+
+    </dl>
+
+    {# Disconnect form #}
+    <div class="pt-2 border-t border-white/5">
+      <form
+        method="POST"
+        action="/oauth/disconnect"
+        onsubmit="return confirm('Disconnect your LinkedIn account? This will delete the stored tokens. You can reconnect at any time.')"
+      >
+        <input type="hidden" name="csrf_token" value="{{ disconnect_csrf_token }}" />
+        <button
+          type="submit"
+          class="inline-flex items-center gap-2 text-sm text-danger border border-danger/30 hover:bg-danger/10 px-4 py-2 rounded-lg transition-colors"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+          Disconnect
+        </button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
