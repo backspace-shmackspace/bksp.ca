@@ -31,9 +31,9 @@ _AUTHORIZATION_URL = "https://www.linkedin.com/oauth/v2/authorization"
 _TOKEN_URL = "https://www.linkedin.com/oauth/v2/accessToken"
 
 # Scopes: openid and profile come with "Share on LinkedIn" (auto-granted).
-# r_member_postAnalytics and community management scopes will be added in the
-# data sync plan after Community Management API access is confirmed.
-_SCOPES = "openid profile"
+# w_member_social enables publishing posts on behalf of the authenticated member.
+# Users who connected before this scope was added must re-authorize.
+_SCOPES = "openid profile w_member_social"
 
 # Token lifetime constants (from LinkedIn documentation)
 _ACCESS_TOKEN_LIFETIME_SECONDS = 60 * 24 * 3600  # 60 days

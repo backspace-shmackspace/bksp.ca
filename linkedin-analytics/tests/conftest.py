@@ -11,7 +11,7 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, Session
 
 from app.database import get_session, init_db
-from app.models import Base, DailyMetric, DemographicSnapshot, FollowerSnapshot, Post, Upload
+from app.models import Base, DailyMetric, DemographicSnapshot, FollowerSnapshot, Post, PostDemographic, Upload
 
 # ---------------------------------------------------------------------------
 # Paths

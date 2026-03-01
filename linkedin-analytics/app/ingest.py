@@ -23,7 +23,7 @@ from typing import Any
 import openpyxl
 from sqlalchemy.orm import Session
 
-from app.models import DailyMetric, DemographicSnapshot, FollowerSnapshot, Post, Upload
+from app.models import DailyMetric, DemographicSnapshot, FollowerSnapshot, Post, PostDemographic, Upload
 
 logger = logging.getLogger(__name__)
 
@@ -574,6 +574,9 @@ def _upsert_post(session: Session, record: dict[str, Any]) -> Post:
         if record.get("post_type") and not existing.post_type:
             existing.post_type = record["post_type"]
         existing.recalculate_engagement_rate()
+        # Transition status: if the post was published via the API and now has analytics, mark as linked
+        if existing.status == "published" and existing.content:
+            existing.status = "analytics_linked"
         return existing
 
     post = Post(
@@ -750,6 +753,245 @@ def load_to_db(session: Session, parsed: ParsedExport) -> ImportStats:
     return stats
 
 
+# ---------------------------------------------------------------------------
+# Per-post XLSX export detection and parsing
+# ---------------------------------------------------------------------------
+
+
+def _detect_xlsx_format(wb: openpyxl.Workbook) -> str:
+    """Detect XLSX export format by sheet names.
+
+    Returns:
+        "per_post" if PERFORMANCE and TOP DEMOGRAPHICS sheets are present.
+        "aggregate" if DISCOVERY and ENGAGEMENT sheets are present.
+        "unknown" otherwise.
+    """
+    sheet_names = {s.strip().lower() for s in wb.sheetnames}
+    if "performance" in sheet_names and "top demographics" in sheet_names:
+        return "per_post"
+    if "discovery" in sheet_names and "engagement" in sheet_names:
+        return "aggregate"
+    return "unknown"
+
+
+def _parse_per_post_performance(ws: Any) -> dict[str, str]:
+    """Parse key-value pairs from the PERFORMANCE sheet.
+
+    The PERFORMANCE sheet uses a key-value layout (not tabular):
+    - Row 1: Post URL = https://...urn:li:share:1234
+    - Row 2: Post Date = Feb 25, 2026
+    - Row 3: Post Publish Time = 11:53 AM
+    - Row 5+: Metric = value pairs (Impressions, Reactions, etc.)
+
+    Values in column B are strings (may include commas in numbers like "1,316").
+    """
+    data: dict[str, str] = {}
+    for row in ws.iter_rows(min_row=1, max_col=2, values_only=True):
+        if row[0] and row[1] is not None:
+            key = str(row[0]).strip()
+            val = str(row[1]).strip()
+            data[key] = val
+    return data
+
+
+def _parse_int_with_commas(s: str) -> int:
+    """Parse integer string that may contain commas. Returns 0 on failure."""
+    try:
+        return int(str(s).replace(",", ""))
+    except (ValueError, AttributeError):
+        return 0
+
+
+def _parse_post_hour(time_str: str) -> int | None:
+    """Parse post hour from LinkedIn time format (e.g., '11:53 AM').
+
+    Returns hour in 24-hour format (0-23), or None on failure.
+    """
+    try:
+        from datetime import datetime as _dt
+        t = _dt.strptime(time_str.strip(), "%I:%M %p")
+        return t.hour
+    except (ValueError, AttributeError):
+        return None
+
+
+def _extract_urn_from_url(url: str) -> str | None:
+    """Extract the numeric share ID from a LinkedIn post URL.
+
+    Handles URLs containing urn:li:share:{id} or urn:li:activity:{id}.
+    """
+    match = re.search(r"urn:li:(?:share|activity):(\d+)", url)
+    return match.group(1) if match else None
+
+
+def _parse_per_post_demographics(ws: Any) -> list[dict[str, Any]]:
+    """Parse the TOP DEMOGRAPHICS sheet.
+
+    Tabular format: Category | Value | Percentage
+    Categories: "Company size", "Job title", "Location", "Company"
+    Percentages are floats (0.31) or strings ("< 1%").
+    """
+    rows: list[dict[str, Any]] = []
+    for row in ws.iter_rows(min_row=2, max_col=3, values_only=True):
+        if not row[0] or row[1] is None:
+            continue
+        category = str(row[0]).strip().lower().replace(" ", "_")
+        value = str(row[1]).strip()
+        pct_raw = row[2]
+        if isinstance(pct_raw, (int, float)):
+            percentage = float(pct_raw)
+        elif isinstance(pct_raw, str) and "<" in pct_raw:
+            percentage = 0.005  # "< 1%" stored as 0.5%
+        else:
+            try:
+                percentage = float(str(pct_raw).strip().rstrip("%")) / 100
+            except (ValueError, AttributeError):
+                percentage = 0.0
+        rows.append({
+            "category": category,
+            "value": value,
+            "percentage": percentage,
+        })
+    return rows
+
+
+def ingest_per_post_xlsx(session: Session, wb: openpyxl.Workbook) -> dict[str, Any]:
+    """Ingest a per-post XLSX export.
+
+    Extracts metrics, post_hour, linkedin_post_id, and demographics
+    from the per-post export format.
+
+    Args:
+        session: SQLAlchemy session.
+        wb: Open openpyxl workbook (must contain PERFORMANCE and TOP DEMOGRAPHICS sheets).
+
+    Returns:
+        Dict with import results: post_id, linkedin_post_id, metrics_updated, demographics_imported.
+    """
+    # Find sheets case-insensitively
+    perf_ws = None
+    demo_ws = None
+    for sheet_name in wb.sheetnames:
+        upper = sheet_name.strip().upper()
+        if upper == "PERFORMANCE":
+            perf_ws = wb[sheet_name]
+        elif upper == "TOP DEMOGRAPHICS":
+            demo_ws = wb[sheet_name]
+
+    if perf_ws is None:
+        raise IngestError("Per-post XLSX is missing the PERFORMANCE sheet.")
+    if demo_ws is None:
+        raise IngestError("Per-post XLSX is missing the TOP DEMOGRAPHICS sheet.")
+
+    # Parse performance data
+    perf = _parse_per_post_performance(perf_ws)
+
+    post_url = perf.get("Post URL", "")
+    linkedin_post_id = _extract_urn_from_url(post_url)
+    post_hour = _parse_post_hour(perf.get("Post Publish Time", ""))
+
+    metrics = {
+        "impressions": _parse_int_with_commas(perf.get("Impressions", "0")),
+        "members_reached": _parse_int_with_commas(perf.get("Members reached", "0")),
+        "reactions": _parse_int_with_commas(perf.get("Reactions", "0")),
+        "comments": _parse_int_with_commas(perf.get("Comments", "0")),
+        "reposts": _parse_int_with_commas(perf.get("Reposts", "0")),
+        "saves": _parse_int_with_commas(perf.get("Saves", "0")),
+        "sends": _parse_int_with_commas(perf.get("Sends on LinkedIn", "0")),
+        "profile_views": _parse_int_with_commas(
+            perf.get("Profile viewers from this post", "0")
+        ),
+        "followers_gained": _parse_int_with_commas(
+            perf.get("Followers gained from this post", "0")
+        ),
+    }
+
+    # Find or create the post
+    existing_post: Post | None = None
+    if linkedin_post_id:
+        existing_post = (
+            session.query(Post)
+            .filter(Post.linkedin_post_id == linkedin_post_id)
+            .first()
+        )
+
+    if existing_post:
+        post = existing_post
+        # Per-post export has more granular data; overwrite with exact values
+        for key, val in metrics.items():
+            if hasattr(post, key):
+                setattr(post, key, val)
+        if post_hour is not None:
+            post.post_hour = post_hour
+        post.recalculate_engagement_rate()
+        # Transition status if applicable
+        if post.status == "published" and post.content:
+            post.status = "analytics_linked"
+    else:
+        # Create a new post from per-post export data
+        post_date_str = perf.get("Post Date", "")
+        try:
+            from datetime import datetime as _dt
+            post_date = _dt.strptime(post_date_str, "%b %d, %Y").date()
+        except (ValueError, AttributeError):
+            from datetime import date as _d
+            post_date = _d.today()
+
+        post = Post(
+            linkedin_post_id=linkedin_post_id,
+            post_url=post_url if post_url else None,
+            post_date=post_date,
+            post_hour=post_hour,
+            impressions=metrics.get("impressions", 0),
+            members_reached=metrics.get("members_reached", 0),
+            reactions=metrics.get("reactions", 0),
+            comments=metrics.get("comments", 0),
+            reposts=metrics.get("reposts", 0),
+            saves=metrics.get("saves", 0),
+            sends=metrics.get("sends", 0),
+            profile_views=metrics.get("profile_views", 0),
+            followers_gained=metrics.get("followers_gained", 0),
+        )
+        post.recalculate_engagement_rate()
+        session.add(post)
+        session.flush()  # Get post.id for demographics FK
+
+    # Parse and store demographics
+    demo_rows = _parse_per_post_demographics(demo_ws)
+    demo_count = 0
+    for row in demo_rows:
+        existing_demo = (
+            session.query(PostDemographic)
+            .filter(
+                PostDemographic.post_id == post.id,
+                PostDemographic.category == row["category"],
+                PostDemographic.value == row["value"],
+            )
+            .first()
+        )
+        if existing_demo:
+            existing_demo.percentage = row["percentage"]
+        else:
+            session.add(
+                PostDemographic(
+                    post_id=post.id,
+                    category=row["category"],
+                    value=row["value"],
+                    percentage=row["percentage"],
+                )
+            )
+            demo_count += 1
+
+    session.commit()
+
+    return {
+        "post_id": post.id,
+        "linkedin_post_id": linkedin_post_id,
+        "metrics_updated": True,
+        "demographics_imported": demo_count,
+    }
+
+
 def ingest_file(
     session: Session,
     file_path: Path,
@@ -777,6 +1019,36 @@ def ingest_file(
             f"File '{original_filename}' has already been imported "
             f"(uploaded as '{existing_upload.filename}' on {existing_upload.upload_date})."
         )
+
+    # Auto-detect format for XLSX files
+    if file_path.suffix.lower() in (".xlsx", ".xls"):
+        try:
+            wb = _load_workbook(file_path)
+            fmt = _detect_xlsx_format(wb)
+            wb.close()
+        except Exception:
+            fmt = "aggregate"  # Fall through to standard parser on error
+
+        if fmt == "per_post":
+            try:
+                wb = _load_workbook(file_path)
+                per_post_result = ingest_per_post_xlsx(session, wb)
+                wb.close()
+            except Exception as exc:
+                raise IngestError(f"Per-post XLSX ingest failed: {exc}") from exc
+
+            upload = Upload(
+                filename=original_filename,
+                file_hash=file_hash,
+                records_imported=1,
+                status="completed",
+            )
+            session.add(upload)
+            session.commit()
+
+            # Return a minimal ImportStats compatible result
+            stats = ImportStats(posts_upserted=1)
+            return upload, stats
 
     parsed = parse_linkedin_export(file_path)
     stats = load_to_db(session, parsed)

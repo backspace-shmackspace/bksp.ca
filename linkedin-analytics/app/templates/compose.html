@@ -1,0 +1,404 @@
+{% extends "base.html" %}
+
+{% block title %}Compose{% endblock %}
+{% block page_title %}Compose{% endblock %}
+{% block page_subtitle %}Write and publish a LinkedIn post{% endblock %}
+
+{% block content %}
+
+{# ── Connection status banner ── #}
+{% if not oauth_enabled %}
+  <div class="mb-4 bg-warning/10 border border-warning/30 rounded-lg px-4 py-3 text-sm text-warning">
+    OAuth is not configured. Publishing is unavailable.
+    <a href="/dashboard/settings" class="underline ml-1">Go to Settings</a>
+  </div>
+{% elif not auth_status or not auth_status.connected %}
+  <div class="mb-4 bg-warning/10 border border-warning/30 rounded-lg px-4 py-3 text-sm text-warning">
+    Not connected to LinkedIn. Publishing is unavailable.
+    <a href="/dashboard/settings" class="underline ml-1">Connect in Settings</a>
+  </div>
+{% elif not has_publish_scope %}
+  <div class="mb-4 bg-warning/10 border border-warning/30 rounded-lg px-4 py-3 text-sm text-warning">
+    Your LinkedIn connection needs to be updated. Please reconnect in Settings to enable publishing.
+    <a href="/dashboard/settings" class="underline ml-1">Reconnect</a>
+  </div>
+{% endif %}
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+  {# ── Left: Compose panel ── #}
+  <div class="space-y-4">
+
+    {# Draft selector #}
+    {% if available_drafts %}
+    <div class="bg-card rounded-xl border border-white/5 p-4">
+      <label class="block text-xs text-text-dim mb-2">Load from draft file</label>
+      <div class="flex items-center gap-2">
+        <select id="draftSelector"
+                class="flex-1 bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-text
+                       focus:outline-none focus:border-accent/50 cursor-pointer">
+          <option value="">-- select a draft --</option>
+          {% for draft in available_drafts %}
+            <option value="{{ draft.filename }}"
+                    data-draft-id="{{ draft.draft_id or '' }}"
+                    data-title="{{ draft.title }}">
+              {% if draft.draft_id %}#{{ draft.draft_id }} - {% endif %}{{ draft.title }}
+            </option>
+          {% endfor %}
+        </select>
+        <button onclick="loadSelectedDraft()"
+                class="text-xs bg-white/5 hover:bg-white/10 text-text-dim px-3 py-1.5 rounded transition-colors">
+          Load
+        </button>
+      </div>
+    </div>
+    {% endif %}
+
+    {# Title field #}
+    <div class="bg-card rounded-xl border border-white/5 p-4">
+      <label for="postTitle" class="block text-xs text-text-dim mb-1">Title (dashboard display only)</label>
+      <input type="text" id="postTitle" maxlength="100"
+             value="{{ prefill_title }}"
+             placeholder="Optional title for your records"
+             class="w-full bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-text
+                    focus:outline-none focus:border-accent/50">
+    </div>
+
+    {# Main text area #}
+    <div class="bg-card rounded-xl border border-white/5 p-4">
+      <div class="flex items-center justify-between mb-2">
+        <label for="postContent" class="text-xs text-text-dim">Post content</label>
+        <span id="charCount" class="text-xs font-mono text-text-dim">0 / 3000</span>
+      </div>
+      <textarea id="postContent" rows="14"
+                placeholder="Write your post here..."
+                oninput="updateCharCount(); updatePreview();"
+                class="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-text
+                       font-mono leading-relaxed resize-none focus:outline-none focus:border-accent/50
+                       placeholder:text-text-dim">{{ prefill_content }}</textarea>
+    </div>
+
+    {# Visibility and draft ID #}
+    <div class="grid grid-cols-2 gap-3">
+      <div class="bg-card rounded-xl border border-white/5 p-4">
+        <label class="block text-xs text-text-dim mb-1">Visibility</label>
+        <select id="visibility"
+                class="w-full bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-text
+                       focus:outline-none focus:border-accent/50 cursor-pointer">
+          <option value="PUBLIC">Public</option>
+          <option value="CONNECTIONS">Connections only</option>
+        </select>
+      </div>
+      <div class="bg-card rounded-xl border border-white/5 p-4">
+        <label class="block text-xs text-text-dim mb-1">Draft # (link to file)</label>
+        <input type="text" id="draftId" maxlength="20"
+               value="{{ prefill_draft_id }}"
+               placeholder="e.g. 001"
+               class="w-full bg-white/5 border border-white/10 rounded px-3 py-1.5 text-sm text-text font-mono
+                      focus:outline-none focus:border-accent/50">
+      </div>
+    </div>
+
+    {# Status / result area #}
+    <div id="statusArea" class="hidden bg-card rounded-xl border border-white/5 p-4 text-sm"></div>
+
+    {# Action buttons #}
+    <div class="flex items-center gap-3">
+      <button id="saveDraftBtn" onclick="saveDraft()"
+              class="inline-flex items-center gap-2 bg-white/5 hover:bg-white/10 text-text-muted
+                     text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+        Save Draft
+      </button>
+      <button id="publishBtn" onclick="confirmPublish()"
+              {% if not has_publish_scope %}disabled{% endif %}
+              class="inline-flex items-center gap-2 bg-accent hover:bg-accent-hover text-white
+                     text-sm font-medium px-4 py-2 rounded-lg transition-colors
+                     disabled:opacity-40 disabled:cursor-not-allowed">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+        </svg>
+        Publish to LinkedIn
+      </button>
+      <div id="publishSpinner" class="hidden">
+        <svg class="w-5 h-5 animate-spin text-accent" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+        </svg>
+      </div>
+    </div>
+
+    {# Hidden fields #}
+    <input type="hidden" id="csrfToken" value="{{ publish_csrf_token }}">
+    <input type="hidden" id="existingPostId" value="{{ existing_post.id if existing_post else '' }}">
+
+  </div>
+
+  {# ── Right: Preview panel ── #}
+  <div>
+    <div class="bg-card rounded-xl border border-white/5 p-4 sticky top-20">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-xs font-medium text-text-dim uppercase tracking-wide">Preview</h3>
+        <span class="text-xs text-text-dim" id="lineCount">0 lines</span>
+      </div>
+      <div id="previewContent"
+           class="min-h-48 text-sm text-text leading-relaxed whitespace-pre-wrap font-mono
+                  border-t border-white/5 pt-3 text-text-muted">
+        Your post will appear here.
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{# Confirmation dialog (hidden) #}
+<div id="confirmDialog" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+  <div class="bg-navy-700 border border-white/10 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
+    <h3 class="text-base font-semibold text-text mb-2">Publish to LinkedIn?</h3>
+    <p class="text-sm text-text-muted mb-4">
+      This will post to your LinkedIn profile immediately. This action cannot be undone from the dashboard.
+    </p>
+    <div class="flex justify-end gap-3">
+      <button onclick="closeConfirm()"
+              class="text-sm bg-white/5 hover:bg-white/10 text-text-muted px-4 py-2 rounded-lg transition-colors">
+        Cancel
+      </button>
+      <button onclick="publishPost()"
+              class="text-sm bg-accent hover:bg-accent-hover text-white px-4 py-2 rounded-lg transition-colors">
+        Confirm Publish
+      </button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+  // Initialize character count and preview on page load
+  document.addEventListener("DOMContentLoaded", () => {
+    updateCharCount();
+    updatePreview();
+  });
+
+  function updateCharCount() {
+    const text = document.getElementById("postContent").value;
+    const count = text.length;
+    const el = document.getElementById("charCount");
+    el.textContent = `${count.toLocaleString()} / 3,000`;
+    if (count > 3000) {
+      el.className = "text-xs font-mono text-danger";
+    } else if (count > 2700) {
+      el.className = "text-xs font-mono text-warning";
+    } else {
+      el.className = "text-xs font-mono text-text-dim";
+    }
+  }
+
+  function updatePreview() {
+    const text = document.getElementById("postContent").value;
+    const preview = document.getElementById("previewContent");
+    const lineCountEl = document.getElementById("lineCount");
+    if (text.trim()) {
+      preview.textContent = text;
+      const lines = text.split("\n").length;
+      lineCountEl.textContent = `${lines} line${lines !== 1 ? "s" : ""}`;
+    } else {
+      preview.textContent = "Your post will appear here.";
+      lineCountEl.textContent = "0 lines";
+    }
+  }
+
+  async function loadSelectedDraft() {
+    const sel = document.getElementById("draftSelector");
+    const filename = sel.value;
+    if (!filename) return;
+
+    const option = sel.selectedOptions[0];
+    const draftId = option.dataset.draftId || "";
+    const title = option.dataset.title || "";
+
+    try {
+      const resp = await fetch(`/api/drafts/${encodeURIComponent(filename)}`);
+      if (!resp.ok) {
+        showStatus("Could not load draft: " + resp.statusText, "error");
+        return;
+      }
+      const data = await resp.json();
+      document.getElementById("postContent").value = data.content;
+      if (draftId) document.getElementById("draftId").value = draftId;
+      if (title && !document.getElementById("postTitle").value) {
+        document.getElementById("postTitle").value = title;
+      }
+      updateCharCount();
+      updatePreview();
+    } catch (e) {
+      showStatus("Failed to load draft file.", "error");
+    }
+  }
+
+  async function saveDraft() {
+    const text = document.getElementById("postContent").value.trim();
+    if (!text) {
+      showStatus("Cannot save an empty draft.", "error");
+      return;
+    }
+
+    const btn = document.getElementById("saveDraftBtn");
+    btn.disabled = true;
+    btn.textContent = "Saving...";
+
+    const payload = {
+      text,
+      title: document.getElementById("postTitle").value.trim() || null,
+      draft_id: document.getElementById("draftId").value.trim() || null,
+      post_id: document.getElementById("existingPostId").value || null,
+      save_as_draft: true,
+    };
+    if (payload.post_id) payload.post_id = parseInt(payload.post_id, 10);
+
+    try {
+      const resp = await fetch("/api/posts/publish", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload),
+      });
+      const data = await resp.json();
+      if (resp.ok) {
+        document.getElementById("existingPostId").value = data.id;
+        showStatus(
+          `Draft saved (ID: ${data.id}). <a href="/dashboard/posts/${data.id}" class="underline">View post</a>`,
+          "success"
+        );
+      } else {
+        showStatus("Save failed: " + (data.detail || "Unknown error"), "error");
+      }
+    } catch (e) {
+      showStatus("Network error while saving.", "error");
+    }
+
+    btn.disabled = false;
+    btn.textContent = "Save Draft";
+  }
+
+  function confirmPublish() {
+    const text = document.getElementById("postContent").value.trim();
+    if (!text) {
+      showStatus("Cannot publish an empty post.", "error");
+      return;
+    }
+    if (text.length > 3000) {
+      showStatus(`Post is ${text.length} characters. Maximum is 3,000.`, "error");
+      return;
+    }
+    document.getElementById("confirmDialog").classList.remove("hidden");
+  }
+
+  function closeConfirm() {
+    document.getElementById("confirmDialog").classList.add("hidden");
+  }
+
+  async function publishPost() {
+    closeConfirm();
+
+    const btn = document.getElementById("publishBtn");
+    const spinner = document.getElementById("publishSpinner");
+    btn.disabled = true;
+    btn.classList.add("hidden");
+    spinner.classList.remove("hidden");
+
+    const text = document.getElementById("postContent").value.trim();
+    const csrfToken = document.getElementById("csrfToken").value;
+    const existingPostId = document.getElementById("existingPostId").value;
+
+    const payload = {
+      text,
+      title: document.getElementById("postTitle").value.trim() || null,
+      draft_id: document.getElementById("draftId").value.trim() || null,
+      post_id: existingPostId ? parseInt(existingPostId, 10) : null,
+      visibility: document.getElementById("visibility").value,
+      save_as_draft: false,
+      csrf_token: csrfToken,
+    };
+
+    try {
+      const resp = await fetch("/api/posts/publish", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload),
+      });
+      const data = await resp.json();
+
+      if (resp.ok) {
+        const url = data.linkedin_url || "";
+        showStatus(
+          `Published! ${url ? `<a href="${url}" target="_blank" rel="noopener" class="underline">View on LinkedIn</a>` : ""} &mdash; <a href="/dashboard/posts/${data.id}" class="underline">View in dashboard</a>`,
+          "success"
+        );
+        // Keep button disabled after success to prevent re-publish
+        spinner.classList.add("hidden");
+        btn.classList.remove("hidden");
+        btn.textContent = "Published";
+      } else if (resp.status === 429) {
+        const detail = typeof data.detail === "object" ? data.detail : {message: data.detail};
+        const retryAfter = detail.retry_after_seconds;
+        let msg = detail.message || "Rate limited by LinkedIn.";
+        if (retryAfter) {
+          msg += ` Retry in ${retryAfter} seconds.`;
+          startRetryCountdown(retryAfter, btn, spinner);
+        } else {
+          re_enablePublish(btn, spinner);
+        }
+        showStatus(msg, "error");
+      } else {
+        const detail = typeof data.detail === "object" ? JSON.stringify(data.detail) : (data.detail || "Unknown error");
+        showStatus("Publish failed: " + detail, "error");
+        re_enablePublish(btn, spinner);
+      }
+    } catch (e) {
+      showStatus("Network error while publishing.", "error");
+      re_enablePublish(btn, spinner);
+    }
+  }
+
+  function re_enablePublish(btn, spinner) {
+    spinner.classList.add("hidden");
+    btn.classList.remove("hidden");
+    btn.disabled = false;
+    btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+    </svg> Publish to LinkedIn`;
+  }
+
+  function startRetryCountdown(seconds, btn, spinner) {
+    let remaining = seconds;
+    spinner.classList.add("hidden");
+    btn.classList.remove("hidden");
+    btn.disabled = true;
+
+    const interval = setInterval(() => {
+      remaining--;
+      btn.textContent = `Retry in ${remaining}s`;
+      if (remaining <= 0) {
+        clearInterval(interval);
+        btn.disabled = false;
+        btn.textContent = "Publish to LinkedIn";
+      }
+    }, 1000);
+  }
+
+  function showStatus(message, type) {
+    const area = document.getElementById("statusArea");
+    area.classList.remove("hidden");
+    const colorClass = type === "success"
+      ? "bg-success/10 border-success/30 text-success"
+      : "bg-danger/10 border-danger/30 text-danger";
+    area.className = `bg-card rounded-xl border p-4 text-sm ${colorClass}`;
+    area.innerHTML = message;
+    area.scrollIntoView({behavior: "smooth", block: "nearest"});
+  }
+</script>
+{% endblock %}

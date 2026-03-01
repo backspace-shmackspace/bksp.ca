@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+
+{% block title %}Posts{% endblock %}
+{% block page_title %}Posts{% endblock %}
+{% block page_subtitle %}Unified timeline of drafts, published posts, and analytics{% endblock %}
+
+{% block header_actions %}
+  <a href="/dashboard/compose"
+     class="inline-flex items-center gap-1.5 bg-accent hover:bg-accent-hover text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
+    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+    </svg>
+    New Post
+  </a>
+{% endblock %}
+
+{% block content %}
+
+{# ── Filter + sort bar ── #}
+<div class="flex flex-wrap items-center gap-3 mb-6">
+  <div class="flex items-center gap-1 bg-card border border-white/5 rounded-lg p-1">
+    {% for val, label in [
+      (None,              "All"),
+      ("draft",           "Draft"),
+      ("published",       "Published"),
+      ("linked",          "Linked"),
+      ("imported",        "Imported"),
+    ] %}
+      {% set is_active = status_filter == val %}
+      <a href="/dashboard/posts{% if val %}?status_filter={{ val }}{% endif %}"
+         class="text-xs px-3 py-1.5 rounded transition-colors
+                {% if is_active %}bg-accent/20 text-accent font-medium{% else %}text-text-dim hover:text-text hover:bg-white/5{% endif %}">
+        {{ label }}
+      </a>
+    {% endfor %}
+  </div>
+
+  <div class="flex items-center gap-2 ml-auto">
+    <span class="text-xs text-text-dim">Sort by</span>
+    <select onchange="window.location.href='/dashboard/posts' + (new URLSearchParams({status_filter: '{{ status_filter or '' }}', sort: this.value})).toString().replace(/^/, '?')"
+            class="bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-text focus:outline-none cursor-pointer">
+      <option value="post_date" {% if sort == 'post_date' %}selected{% endif %}>Date</option>
+      <option value="impressions" {% if sort == 'impressions' %}selected{% endif %}>Impressions</option>
+      <option value="engagement_rate" {% if sort == 'engagement_rate' %}selected{% endif %}>Engagement</option>
+    </select>
+  </div>
+</div>
+
+{% if not has_data %}
+  <div class="text-center py-20 text-text-dim">
+    <p class="text-sm">No posts yet. Import an XLSX export or compose your first post.</p>
+    <a href="/dashboard/compose" class="mt-3 inline-block text-sm text-accent hover:underline">Compose a post</a>
+  </div>
+{% else %}
+
+{# ── Post cards ── #}
+<div class="space-y-3 mb-8">
+  {% for post in posts %}
+    {% set status = post.status %}
+    {% if status == 'draft' %}
+      {% set badge_class = "bg-blue-500/20 text-blue-400" %}
+      {% set badge_label = "Draft" %}
+    {% elif status == 'published' %}
+      {% set badge_class = "bg-success/20 text-success" %}
+      {% set badge_label = "Published" %}
+    {% elif status == 'analytics_linked' %}
+      {% set badge_class = "bg-amber-500/20 text-amber-400" %}
+      {% set badge_label = "Linked" %}
+    {% else %}
+      {% set badge_class = "bg-white/5 text-text-dim" %}
+      {% set badge_label = "Imported" %}
+    {% endif %}
+
+    <div class="bg-card rounded-xl border border-white/5 p-4 hover:border-white/10 transition-colors">
+      <div class="flex items-start justify-between gap-4">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="inline-block text-xs font-medium px-2 py-0.5 rounded {{ badge_class }}">
+              {{ badge_label }}
+            </span>
+            {% if post.draft_id %}
+              <span class="inline-block text-xs font-mono bg-accent/10 text-accent px-1.5 py-0.5 rounded">
+                #{{ post.draft_id }}
+              </span>
+            {% endif %}
+            <span class="text-xs text-text-dim font-mono">{{ post.post_date }}</span>
+          </div>
+
+          <a href="/dashboard/posts/{{ post.id }}"
+             class="block text-sm font-medium text-text hover:text-accent transition-colors leading-snug truncate">
+            {{ post.display_title }}
+          </a>
+
+          {% if post.content %}
+            <p class="text-xs text-text-dim mt-1 line-clamp-2 leading-relaxed">
+              {{ post.content[:150] }}{% if post.content | length > 150 %}...{% endif %}
+            </p>
+          {% endif %}
+        </div>
+
+        <div class="shrink-0 text-right space-y-1">
+          {% if post.impressions %}
+            <div class="text-sm font-mono font-medium text-text">{{ "{:,}".format(post.impressions) }}</div>
+            <div class="text-xs text-text-dim">impressions</div>
+          {% endif %}
+          {% if post.engagement_rate %}
+            <div class="text-xs font-mono
+                        {% if post.engagement_rate >= 0.05 %}text-success
+                        {% elif post.engagement_rate >= 0.02 %}text-warning
+                        {% else %}text-text-dim{% endif %}">
+              {{ "%.1f%%"|format(post.engagement_rate * 100) }} ER
+            </div>
+          {% endif %}
+          {% if post.post_url %}
+            <a href="{{ post.post_url }}" target="_blank" rel="noopener"
+               class="inline-flex items-center gap-1 text-xs text-accent/60 hover:text-accent transition-colors">
+              LinkedIn
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </a>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if post.saves or post.sends or post.profile_views or post.followers_gained %}
+        <div class="mt-3 pt-3 border-t border-white/5 flex items-center gap-4 text-xs text-text-dim">
+          {% if post.saves %}
+            <span>{{ post.saves }} saves</span>
+          {% endif %}
+          {% if post.sends %}
+            <span>{{ post.sends }} sends</span>
+          {% endif %}
+          {% if post.profile_views %}
+            <span>{{ post.profile_views }} profile views</span>
+          {% endif %}
+          {% if post.followers_gained %}
+            <span>+{{ post.followers_gained }} followers</span>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+  {% endfor %}
+</div>
+
+{% endif %}
+
+{# ── Unlinked drafts section ── #}
+{% if unlinked_drafts %}
+<div class="mt-6">
+  <h3 class="text-sm font-medium text-text mb-3">Draft files not yet published</h3>
+  <div class="space-y-2">
+    {% for draft in unlinked_drafts %}
+      <div class="bg-card border border-white/5 rounded-lg p-3 flex items-center justify-between gap-3">
+        <div class="flex items-center gap-2 min-w-0">
+          {% if draft.draft_id %}
+            <span class="text-xs font-mono bg-accent/10 text-accent px-1.5 py-0.5 rounded shrink-0">
+              #{{ draft.draft_id }}
+            </span>
+          {% endif %}
+          <span class="text-sm text-text truncate">{{ draft.title }}</span>
+          <span class="text-xs text-text-dim truncate">{{ draft.filename }}</span>
+        </div>
+        <a href="/dashboard/compose?draft={{ draft.filename | urlencode }}"
+           class="shrink-0 text-xs bg-accent/20 hover:bg-accent/30 text-accent px-3 py-1 rounded transition-colors">
+          Compose
+        </a>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

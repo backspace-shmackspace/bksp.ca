@@ -10,6 +10,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    Text,
     UniqueConstraint,
     func,
 )
@@ -45,8 +46,24 @@ class Post(Base):
     created_at: datetime = Column(DateTime, default=func.now())
     updated_at: datetime = Column(DateTime, default=func.now(), onupdate=func.now())
 
+    # Post body content (stored when composed via the dashboard composer)
+    content: str | None = Column("content", Text, nullable=True)
+
+    # Post lifecycle status: "draft", "published", "analytics_linked", or None (imported)
+    status: str | None = Column("status", String(20), nullable=True)
+
+    # Additional per-post metrics from per-post XLSX exports
+    saves: int | None = Column(Integer, nullable=True, default=0)
+    sends: int | None = Column(Integer, nullable=True, default=0)
+    profile_views: int | None = Column(Integer, nullable=True, default=0)
+    followers_gained: int | None = Column(Integer, nullable=True, default=0)
+    reposts: int | None = Column(Integer, nullable=True, default=0)
+
     daily_metrics = relationship(
         "DailyMetric", back_populates="post", cascade="all, delete-orphan"
+    )
+    demographics = relationship(
+        "PostDemographic", back_populates="post", cascade="all, delete-orphan"
     )
 
     @property
@@ -146,6 +163,38 @@ class DemographicSnapshot(Base):
 
     def __repr__(self) -> str:
         return f"<DemographicSnapshot date={self.snapshot_date} {self.category}={self.value}>"
+
+
+class PostDemographic(Base):
+    """Per-post demographic breakdown from LinkedIn per-post XLSX exports.
+
+    Stores category/value/percentage triples for each post. Categories include:
+    - "company_size": e.g., "10,001+ employees", "1001-5000 employees"
+    - "job_title": e.g., "Software Engineer", "Security Engineer"
+    - "location": e.g., "Fredericton", "Greater Toronto Area, Canada"
+    - "company": e.g., "IBM", "OCAS"
+
+    The "company_size" and "company" categories are new (only available in
+    per-post exports, not in the aggregate DISCOVERY/ENGAGEMENT export).
+    """
+
+    __tablename__ = "post_demographics"
+
+    id: int = Column(Integer, primary_key=True, autoincrement=True)
+    post_id: int = Column(Integer, ForeignKey("posts.id", ondelete="CASCADE"), nullable=False)
+    category: str = Column(String, nullable=False)
+    value: str = Column(String, nullable=False)
+    percentage: float = Column(Float, nullable=False)
+    created_at: datetime = Column(DateTime, default=func.now())
+
+    post = relationship("Post", back_populates="demographics")
+
+    __table_args__ = (
+        UniqueConstraint("post_id", "category", "value", name="uq_post_demo"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<PostDemographic post={self.post_id} {self.category}={self.value}>"
 
 
 class Upload(Base):

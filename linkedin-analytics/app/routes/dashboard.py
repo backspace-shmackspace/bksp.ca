@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_session
-from app.models import DailyMetric, DemographicSnapshot, FollowerSnapshot, Post, Upload
+from app.models import DailyMetric, DemographicSnapshot, FollowerSnapshot, Post, PostDemographic, Upload
 
 logger = logging.getLogger(__name__)
 
@@ -129,6 +129,23 @@ async def post_detail(
         .first()
     )
 
+    # Per-post demographics (from per-post XLSX imports)
+    post_demographics = (
+        db.query(PostDemographic)
+        .filter(PostDemographic.post_id == post_id)
+        .order_by(PostDemographic.category, PostDemographic.percentage.desc())
+        .all()
+    )
+    # Group demographics by category for the template
+    demo_by_category: dict[str, list] = {}
+    for d in post_demographics:
+        d_display = type("DemoDisplay", (), {
+            "category": d.category,
+            "value": d.value,
+            "percentage": round(d.percentage * 100, 1),
+        })()
+        demo_by_category.setdefault(d.category, []).append(d_display)
+
     return templates.TemplateResponse(
         request,
         "post_detail.html",
@@ -137,6 +154,7 @@ async def post_detail(
             "daily_metrics": daily_metrics,
             "prev_post": prev_post,
             "next_post": next_post,
+            "demo_by_category": demo_by_category,
         },
     )
 
@@ -218,6 +236,142 @@ async def dashboard_settings(
             "flash_connected": connected_param == "1",
             "flash_disconnected": disconnected_param == "1",
             "flash_error": flash_error,
+        },
+    )
+
+
+@router.get("/dashboard/compose", response_class=HTMLResponse)
+async def compose(
+    request: Request,
+    response: Response,
+    draft: str | None = None,
+    post_id: int | None = None,
+    db: Session = Depends(get_session),
+) -> HTMLResponse:
+    """Render the post composer page.
+
+    If ?draft=filename is provided, the draft content is passed to the template
+    for pre-loading (frontmatter stripped).
+    If ?post_id=N is provided, pre-loads a saved draft post for editing.
+    """
+    from app.oauth import get_auth_status
+    from app.routes.api import generate_publish_nonce_cookie, list_draft_files, read_draft_file
+    import hashlib as _hashlib
+    import hmac as _hmac
+
+    auth_status = None
+    if settings.oauth_enabled:
+        auth_status = get_auth_status(db)
+
+    has_publish_scope = (
+        auth_status is not None
+        and auth_status.connected
+        and "w_member_social" in auth_status.scopes
+    )
+
+    # Generate CSRF nonce for publish action
+    nonce = generate_publish_nonce_cookie(response)
+    key = settings.token_encryption_key.encode() if settings.token_encryption_key else b""
+    if key:
+        message = f"publish:{nonce}".encode()
+        publish_csrf_token = _hmac.new(key, message, _hashlib.sha256).hexdigest()
+    else:
+        publish_csrf_token = ""
+
+    # Load draft content if requested
+    prefill_content = None
+    prefill_title = None
+    prefill_draft_id = None
+
+    if draft:
+        prefill_content = read_draft_file(draft)
+        stem = Path(draft).stem
+        parts = stem.split("-", 1)
+        prefill_draft_id = parts[0] if parts[0].isdigit() else None
+        prefill_title = parts[1].replace("-", " ").title() if len(parts) > 1 else stem
+
+    # Load existing draft post if post_id provided
+    existing_post = None
+    if post_id:
+        existing_post = db.query(Post).filter(Post.id == post_id).first()
+        if existing_post:
+            prefill_content = prefill_content or existing_post.content or ""
+            prefill_title = prefill_title or existing_post.title or ""
+            prefill_draft_id = prefill_draft_id or existing_post.draft_id
+
+    available_drafts = list_draft_files()
+
+    return templates.TemplateResponse(
+        request,
+        "compose.html",
+        {
+            "oauth_enabled": settings.oauth_enabled,
+            "auth_status": auth_status,
+            "has_publish_scope": has_publish_scope,
+            "publish_csrf_token": publish_csrf_token,
+            "available_drafts": available_drafts,
+            "prefill_content": prefill_content or "",
+            "prefill_title": prefill_title or "",
+            "prefill_draft_id": prefill_draft_id or "",
+            "existing_post": existing_post,
+        },
+    )
+
+
+@router.get("/dashboard/posts", response_class=HTMLResponse)
+async def posts_browser(
+    request: Request,
+    status_filter: str | None = None,
+    sort: str = "post_date",
+    db: Session = Depends(get_session),
+) -> HTMLResponse:
+    """Render the posts browser with unified timeline."""
+    from app.routes.api import list_draft_files
+
+    # Validate sort parameter
+    valid_sorts = {"post_date", "impressions", "engagement_rate"}
+    if sort not in valid_sorts:
+        sort = "post_date"
+
+    sort_map = {
+        "post_date": Post.post_date,
+        "impressions": Post.impressions,
+        "engagement_rate": Post.engagement_rate,
+    }
+    sort_col = sort_map[sort]
+
+    query = db.query(Post)
+    if status_filter == "draft":
+        query = query.filter(Post.status == "draft")
+    elif status_filter == "published":
+        query = query.filter(Post.status == "published")
+    elif status_filter == "linked":
+        query = query.filter(Post.status == "analytics_linked")
+    elif status_filter == "imported":
+        query = query.filter(Post.status.is_(None))
+
+    posts = query.order_by(desc(sort_col)).limit(200).all()
+
+    # Get draft files not yet linked to any post
+    all_drafts = list_draft_files()
+    linked_draft_ids = {p.draft_id for p in db.query(Post.draft_id).all() if p.draft_id}
+    unlinked_drafts = [
+        d for d in all_drafts
+        if d["draft_id"] not in linked_draft_ids
+    ]
+
+    total_posts = db.query(func.count(Post.id)).scalar() or 0
+
+    return templates.TemplateResponse(
+        request,
+        "posts.html",
+        {
+            "posts": posts,
+            "status_filter": status_filter,
+            "sort": sort,
+            "unlinked_drafts": unlinked_drafts,
+            "total_posts": total_posts,
+            "has_data": total_posts > 0,
         },
     )
 

@@ -165,7 +165,17 @@ async def oauth_callback(
         _clear_oauth_cookies(redirect)
         return redirect
 
-    store_tokens(db, token_response)
+    # Fetch the member ID immediately using the new access token, BEFORE storing tokens.
+    # This eliminates the window where a token row exists without a linkedin_member_id.
+    from app.linkedin_client import get_member_id
+    member_id = await get_member_id(token_response.access_token)
+    if not member_id:
+        logger.warning(
+            "Could not fetch member ID from /userinfo during callback. "
+            "Publishing will be unavailable until reconnection."
+        )
+
+    store_tokens(db, token_response, member_id=member_id)
 
     logger.info("LinkedIn OAuth tokens stored successfully.")
 

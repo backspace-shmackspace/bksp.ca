@@ -13,6 +13,11 @@ class Settings(BaseSettings):
     log_level: str = "info"
     max_upload_size_mb: int = 50
 
+    # Path to LinkedIn draft markdown files. Default assumes bksp project structure.
+    # Must be explicitly set in Docker environments (Path.home() may not resolve correctly).
+    # Docker: mount as volume and set DRAFTS_DIR=/app/drafts/linkedin in the environment.
+    drafts_dir: Path = Path.home() / "bksp" / "drafts" / "linkedin"
+
     # LinkedIn OAuth (all optional; if client_id is empty, OAuth features are disabled)
     linkedin_client_id: str = ""
     linkedin_client_secret: str = ""
