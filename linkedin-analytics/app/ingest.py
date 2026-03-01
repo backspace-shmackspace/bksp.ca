@@ -906,12 +906,31 @@ def ingest_per_post_xlsx(session: Session, wb: openpyxl.Workbook) -> dict[str, A
         ),
     }
 
-    # Find or create the post
+    # Parse post date early so it's available for fallback matching.
+    post_date_str = perf.get("Post Date", "")
+    try:
+        from datetime import datetime as _dt
+        post_date = _dt.strptime(post_date_str, "%b %d, %Y").date()
+    except (ValueError, AttributeError):
+        from datetime import date as _d
+        post_date = _d.today()
+
+    # Find or create the post.
+    # Primary match: by share/activity URN extracted from per-post XLSX.
+    # Fallback: match by post_date, since aggregate and per-post XLSX exports
+    # use different URN types (urn:li:activity vs urn:li:share) with different
+    # numeric IDs for the same post.
     existing_post: Post | None = None
     if linkedin_post_id:
         existing_post = (
             session.query(Post)
             .filter(Post.linkedin_post_id == linkedin_post_id)
+            .first()
+        )
+    if not existing_post:
+        existing_post = (
+            session.query(Post)
+            .filter(Post.post_date == post_date)
             .first()
         )
 
@@ -923,19 +942,14 @@ def ingest_per_post_xlsx(session: Session, wb: openpyxl.Workbook) -> dict[str, A
                 setattr(post, key, val)
         if post_hour is not None:
             post.post_hour = post_hour
+        # Store the share URL if we don't have one yet.
+        if post_url and not post.post_url:
+            post.post_url = post_url
         post.recalculate_engagement_rate()
         # Transition status if applicable
         if post.status == "published" and post.content:
             post.status = "analytics_linked"
     else:
-        # Create a new post from per-post export data
-        post_date_str = perf.get("Post Date", "")
-        try:
-            from datetime import datetime as _dt
-            post_date = _dt.strptime(post_date_str, "%b %d, %Y").date()
-        except (ValueError, AttributeError):
-            from datetime import date as _d
-            post_date = _d.today()
 
         post = Post(
             linkedin_post_id=linkedin_post_id,
